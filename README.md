@@ -18,19 +18,9 @@ OSINT（公開情報の調査）とデジタルフォレンジックで怪異の
 
 ## ゲームの遊び方
 
-作中の端末を操作して調べる謎解きゲームです。アプリをウィンドウで開いて証拠を集め、捜査ノートで小問に答えながら進みます。序章と全5章（試作版）。進行状況はブラウザに保存されます。
+**https://ttk1.github.io/utsuro/** を開けば、すぐに遊べます。
 
-### ローカルで遊ぶ
-
-Docker が必要です。
-
-```sh
-docker compose up
-```
-
-ブラウザで http://localhost:8080/ を開きます。止めるときは `Ctrl+C`（バックグラウンドで起動した場合は `docker compose down`）。
-
-`game/index.html` をブラウザで直接開いても遊べます。
+作中の端末を操作して調べる謎解きゲームです。アプリをウィンドウで開いて証拠を集め、捜査ノートで小問に答えながら進みます。序章と全5章（試作版）。パソコンのブラウザでの操作を想定していますが、スマートフォンでも遊べます。進行状況はブラウザに保存されます。
 
 ## ファイル構成
 
@@ -46,14 +36,9 @@ docker compose up
 
 ## 開発
 
-ゲームを序章から終章まで自動で通しプレイするテストがあります。Node はホストに入れず Docker で動かします。
+Docker で動かします（Node などはホストに入れません）。
 
 ```sh
-docker compose run --rm test
+docker compose up              # ローカルで配信 → http://localhost:8080/
+docker compose run --rm test   # 序章から終章まで自動で通しプレイ（最後に「OK: 全章クリア」と出れば成功）
 ```
-
-最後に `OK: 全章クリア` と出れば成功です。
-
-## 公開（GitHub Pages）
-
-main ブランチへ push すると、GitHub Actions（[.github/workflows/deploy.yml](.github/workflows/deploy.yml)）が通しプレイのテストを実行し、通れば `game/` を GitHub Pages に公開します。初回のみ、リポジトリの **Settings → Pages → Source を「GitHub Actions」** に設定する必要があります。
