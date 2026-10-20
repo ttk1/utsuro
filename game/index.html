@@ -240,6 +240,7 @@ tr.pick:hover td{background:var(--surface2)}
 .task .num,.done-step .num{font-family:var(--f-mono);font-size:11px;letter-spacing:.12em;color:var(--accent)}
 .done-step .num{color:var(--ok)}
 .task .q{font-weight:700;margin:2px 0 10px}
+.say{display:inline-block;font-size:11.5px;font-weight:500;color:var(--accent);border:1px solid var(--accent-dim);border-radius:3px;padding:0 6px;margin-right:6px}
 .ans{display:flex;gap:8px;flex-wrap:wrap}
 .ans input[type=text],.ans select{flex:1 1 160px;min-width:0;background:var(--bg);color:var(--fg);border:1px solid var(--line);padding:8px 10px;font:inherit;border-radius:4px}
 .opts{display:flex;flex-direction:column;gap:6px;margin-bottom:10px}
@@ -260,11 +261,26 @@ tr.pick:hover td{background:var(--surface2)}
 .solved .btn{align-self:flex-start;margin-top:4px}
 .memo-list{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px;font-size:13.5px}
 .confirm{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:6px 10px;font-size:13px}
+/* 未読の印、入力中の表示、正解・解明の演出、録画の拡大 */
+#icons .tile{position:relative}
+.badge{position:absolute;top:-4px;right:-4px;width:13px;height:13px;border-radius:50%;background:#e5484d;border:2px solid rgba(0,0,0,.35)}
+.bubble.typing{display:flex;gap:4px;align-items:center;padding:12px 14px;width:max-content}
+.bubble.typing i{width:6px;height:6px;border-radius:50%;background:var(--muted);animation:dot 1s infinite}
+.bubble.typing i:nth-child(2){animation-delay:.15s}.bubble.typing i:nth-child(3){animation-delay:.3s}
+@keyframes dot{0%,60%,100%{opacity:.25;transform:none}30%{opacity:1;transform:translateY(-3px)}}
+.done-step.just{animation:ok 1.2s ease-out}
+@keyframes ok{0%{background:color-mix(in srgb,var(--ok) 35%,transparent)}100%{background:var(--ok-bg)}}
+.solved{animation:rise .5s ease-out}
+@keyframes rise{from{opacity:0;transform:translateY(6px)}}
+#enh .stream{cursor:zoom-in}
+#enh .stream svg{transition:transform .3s ease}
+#enh.zoom .stream{cursor:zoom-out}
+#enh.zoom .stream svg{transform:scale(2.6)}
 @media (prefers-reduced-motion:no-preference){
   .flick{animation:flick 6s infinite}
   @keyframes flick{0%,96%,100%{opacity:1}97%{opacity:.75}98%{opacity:1}99%{opacity:.85}}
 }
-@media (prefers-reduced-motion:reduce){#narr .more,.toast{animation:none}}
+@media (prefers-reduced-motion:reduce){#narr .more,.toast,.bubble.typing i,.done-step.just,.solved{animation:none}#enh .stream svg{transition:none}}
 /* 狭い画面: ウィンドウは一枚ずつ全面に開く */
 @media (max-width:760px){
   #icons{left:0;right:0;top:0;bottom:auto;height:82px;padding:6px 8px;flex-wrap:nowrap;flex-direction:row;overflow-x:auto;gap:2px}
@@ -492,6 +508,12 @@ function initBright(){
   const br=document.getElementById('br');
   const f=()=>{const v=+br.value;document.querySelector('#enh svg').style.filter=`brightness(${v}) contrast(${1+(v-1)*.15}) saturate(${1-(v-1)*.1})`;document.getElementById('brv').textContent='×'+v.toFixed(1)};
   br.oninput=f;f();
+  // 映像をクリックすると、その位置を中心に拡大する（もう一度クリックで戻す）
+  const enh=document.getElementById('enh'),svg=enh.querySelector('svg');
+  enh.querySelector('.stream').onclick=e=>{
+    if(!enh.classList.contains('zoom')){const r=svg.getBoundingClientRect();svg.style.transformOrigin=`${(e.clientX-r.left)/r.width*100}% ${(e.clientY-r.top)/r.height*100}%`}
+    enh.classList.toggle('zoom');
+  };
 }
 
 // ===== 端末 =====
@@ -579,14 +601,23 @@ function A(){return `UA-48213077 を使うサイト:
   UA-48213077-1  kuga-housing.jp   「久我ハウジング管理」
   UA-48213077-2  utsuro.tv         「うつろ放送」
 <span class="dim"># 同じ解析アカウントで管理されている。持ち主は同じ。</span>`}
-let termLog=null;
+let termLog=null,termHist=[];
 function initTerm(){
   const out=document.getElementById('tout'),f=document.getElementById('tform'),inp=document.getElementById('tin'),chips=document.getElementById('tchips');
   if(termLog===null)termLog=`<span class="dim">ghostwire OSINT shell ・ help でコマンド一覧</span>\n`;
   out.innerHTML=termLog;out.scrollTop=out.scrollHeight;
   chips.innerHTML=['help','history','view-source ','whois ','wayback ','analytics ','curl '].map(s=>`<button type="button">${s}</button>`).join('');
   chips.querySelectorAll('button').forEach(b=>b.onclick=()=>{inp.value=b.textContent;inp.focus()});
+  // ↑↓ で打ったコマンドを呼び出す
+  let pos=termHist.length;
+  inp.onkeydown=e=>{
+    if(e.key!=='ArrowUp'&&e.key!=='ArrowDown')return;
+    e.preventDefault();
+    pos=Math.max(0,Math.min(termHist.length,pos+(e.key==='ArrowUp'?-1:1)));
+    inp.value=termHist[pos]||'';
+  };
   f.onsubmit=e=>{e.preventDefault();const raw=inp.value.trim();if(!raw)return;
+    if(termHist[termHist.length-1]!==raw)termHist.push(raw);pos=termHist.length;
     const k=raw.normalize('NFKC').replace(/\s+/g,' ').toLowerCase().replace(/https?:\/\//g,'').replace(/^(\S+ \S+?)\/$/,'$1').replace(/www\./,'');
     if(k==='clear'){termLog='';out.innerHTML='';inp.value='';return}
     let res;
@@ -678,7 +709,7 @@ const CH=[
   [M,'逮捕の前の晩、透さんからメッセージが届いていた。'],
   [M,'「ログは嘘をつかない。嘘をつくのは、ログを読む人間だ」。透さんの口癖だ。今回のログは、全部透さんが犯人だと言っている。']],
  chat:{with:'篠宮 透',msgs:[['篠宮 透','2036/10/16 23:48','ミオ。しばらく事務所に戻れない。<br>最初の事件のファイルを読め。全部そこにある。<br>鍵は、俺が最初に名乗った名前。'],['篠宮 透','23:49','架純には連絡するな。'],['me','23:51','どういうことですか？ 透さん？']],tail:'既読はついていない。'},
- open:['chat'],
+ open:[],
  steps:[
   {type:'text',q:'暗号化された事件ファイルのパスワードは？',
    check:v=>v==='ghostwire',
@@ -717,7 +748,7 @@ $ open 2026_utsuro.enc
   ['','スマホが震えた。ゼミの一つ下の後輩、水野架純からだった。'],
   ['透','本人が書いた文章かどうかは、言葉より先にログが教えてくれる。いつ、どこから、何で書かれたか。']],
  chat:{with:'水野 架純',msgs:[['水野 架純','01:04','先輩、急にすみません。兄と9日間連絡が取れないんです。'],['水野 架純','01:04','警察には行きました。でもブログに「探さないでくれ」って書いてあるから、家出だろうって。'],['水野 架純','01:05','兄はあんな文章書かないです。兄のブログの管理画面と、家族で使ってる位置共有は見られます。'],['me','01:07','ログ全部ちょうだい。消える前に。']]},
- open:['chat'],
+ open:[],
  steps:[
   {type:'multi',q:'「お別れ」の記事を遼本人が書いたとは考えにくい根拠を、すべて選べ。',
    options:['記号が半角になっている','一人称が「俺」になっている','下書き保存をせずに公開されている','スマホから投稿されている','深夜に投稿されている','本文が短い'],
@@ -773,16 +804,16 @@ $ open 2026_utsuro.enc
   ['透','霊は住所を持たない。でも部屋は持っている。窓の外、音、電気。映像には撮った場所が必ず残る。']],
  open:['stream'],
  steps:[
-  {type:'choice',q:'配信の音から、部屋の近くを通っている貨物線はどれ？',
-   options:['北総貨物線','東湾貨物線','西鶴臨港線'],answer:1,
-   why:i=>i===0?'通過時刻が、配信時間（03:33〜03:44）に入っているか確かめよう。':'電源ノイズの周波数は何Hzだったか。',
+  {type:'text',q:'配信の音から、部屋の近くを通っている貨物線は？（路線名）',
+   check:v=>/東湾/.test(v),
+   traps:[[/北総/,'通過時刻が、配信時間（03:33〜03:44）に入っているか確かめよう。'],[/西鶴/,'電源ノイズの周波数は何Hzだったか。その周波数の地域を走っているか。']],
    memo:'電源ノイズは50Hz（東日本）。03:38と03:41の通過音に合うのは東湾貨物線。'},
   {type:'text',q:'窓の外に見える看板の店名は？',
-   check:v=>/^(コイン)?ツキミランドリー$|^つきみらんどりー$/.test(v),
+   check:v=>/^(コイン)?ツキミランドリー$/.test(kata(v).replace(/[・･]/g,'')),
    traps:[[/ーリドンラ|ミキツ/,'そのまま読むとおかしい。この映像は何かが反転していないか？'],[/コインランドリー月見|ランドリー月見/,'似た名前の別の店がある。看板の文字の順番をよく見よう。']],
    memo:'映像は左右反転している（時計の数字が逆）。看板は「ツキミ ランドリー」。'},
   {type:'text',q:'配信されている部屋がある建物の名前は？（地図で探そう）',
-   check:v=>/コーポ月見台|こーぽつきみだい/.test(v),
+   check:v=>/コーポ(月見台|ツキミダイ)/.test(kata(v).replace(/[・･]/g,'')),
    traps:[[/白鷺/,'その建物の窓から、店の看板は読めるだろうか。'],[/メゾン/,'その建物の窓から、看板の表は見えるだろうか。看板がどの壁についているか確かめよう。'],[/北総/,'その近くの店は「ツキミ ランドリー」ではない。']],
    memo:'窓から看板と、その右に踏切が見える建物は「コーポ月見台」。'}
  ],
@@ -818,7 +849,7 @@ $ open 2026_utsuro.enc
  narr:[[M,'「当時はまだ、手作りのスクリプトで調べてたんだよ」。ファイルには、学生だった透さんのシェル履歴がそのまま残っていた。','frame'],
   ['','建物はわかった。次は部屋と、この配信を続けている人間だ。'],
   ['','サイトは消えても、痕跡は残る。ソースのコメント、ドメインの登録記録、誰かが保存した古い版。遼のPCには、彼が途中まで打ったコマンドの履歴も残っていた。'],
-  ['透','端末で調べよう。help でコマンド一覧、history で遼の履歴が見られる。']],
+  ['','（端末では help でコマンド一覧、history で遼が打ったコマンドの履歴が見られる）']],
  open:['term'],
  steps:[
   {type:'text',q:'うつろ放送と同じ持ち主が運営している、もう一つのサイトのドメインは？',
@@ -847,7 +878,7 @@ $ open 2026_utsuro.enc
   ['','その夜、透は廃墟アーカイブ掲示板に書き込んだ。過去の配信の録画を探しています。返信は、配信が終わった三時四十四分に来た。'],
   ['透','ライブの映像なら、同じ部屋でも毎晩ノイズが違うので、ハッシュ値は重ならない。1文字でも違えば別のデータ。完全に一致すれば、同じデータがもう一度流されたということだ。']],
  chat:{with:'灯籠',msgs:[['灯籠','03:44','あんた、水野さんの知り合いか。俺は5年間、毎晩あの配信を録画してる。'],['灯籠','03:46','10/11、確かに人が映った。暗すぎて誰も信じなかったけどな。それと、最近の配信は何かおかしい。毎晩、見覚えがある。'],['灯籠','03:47','配信のデータは作り直さずにそのまま保存してある。各夜の 03:35 を含む区間のハッシュ値を送る。あとは自分で見てくれ。']]},
- open:['chat'],
+ open:[],
  steps:[
   {type:'text',q:'配信が「過去の録画」に差し替えられたのは、何月何日の配信から？',
    check:v=>dateRe('10/12').test(v),
@@ -873,7 +904,7 @@ $ open 2026_utsuro.enc
    <div class="cmp" id="hcmp"><span class="verdict">比較する2行を選んでください。</span></div>`},
   {id:'video',name:'10/11 の録画',icon:'rec',title:'rec_1011_033612.png ― 灯籠の録画',w:580,h:470,init:initBright,html:`<div id="enh">${stream(roomSVG({dark:true,figures:true}),'LIVE うつろ放送','10/11 03:36:12<br>視聴 9')}</div>
    <label class="slider" for="br">明るさ補正<input type="range" id="br" min="1" max="8" step="0.1" value="1"><span class="mono" id="brv">×1.0</span></label>
-   <div class="cap">灯籠の録画から切り出した1フレーム。</div>`}
+   <div class="cap">灯籠の録画から切り出した1フレーム。映像をクリックすると、その場所を拡大できる。</div>`}
  ]
 },
 {
@@ -884,25 +915,37 @@ $ open 2026_utsuro.enc
   ['久我','本当に入ります？ 夜中にね、カメラも何もないのに、あの部屋が映るって噂があるんですよ。'],
   ['','カメラがないはずの部屋。けれど天井の隅には、ネジ穴が四つ残っていた。']],
  chat:{with:'灯籠',msgs:[['灯籠','12:31','十二日の配信を、コマ送りで全部見直した。<br>ループのつなぎ目に、一コマだけ変なのが混ざってる。三時四十三分五十九秒。'],['灯籠','12:32','画像を2枚送る。「継ぎ目」で開いてくれ。']]},
- open:['chat'],
+ open:[],
+ // 後半は久我との対決。言い分の一つひとつに、捜査で得た証拠を突きつける
  steps:[
-  {type:'choice',q:'継ぎ目のフレームから考えて、遼はどこにいる？',
-   options:['天井裏','押入れ','床下','窓の外'],answer:1,
-   why:()=>'2枚の画像を「差分」で重ねると、違うところだけが光る。',
-   memo:'継ぎ目のフレームだけ、押入れの襖が指一本ぶん開いていた。'},
-  {type:'choice',q:'犯人は誰？',
-   options:['黒澄 レイ','遼の元恋人','灯籠','久我 圭吾'],answer:3,
-   why:i=>['黒澄レイには、その時間に別の場所で生配信をしていた記録がある。','元恋人は、その夜は沖縄にいた。','灯籠は302号室の鍵を持っていない。録画を渡したのも彼だ。'][i],
-   memo:'犯人は久我圭吾。'},
-  {type:'multi',q:'久我が犯人だと示す証拠を、すべて選べ。',
-   options:['うつろ放送と久我ハウジング管理の解析IDが同じ','302号室の鍵を管理しているのは久我','10/11の男の腕時計と、久我の銀色の腕時計','10/12から配信が録画に差し替えられた','黒澄レイと遼がネタで揉めていた','「お別れ」がスマホから投稿された'],
-   answer:[0,1,2],
-   why:sel=>sel.some(i=>i>=3)?'選んだ中に、誰がやったかまでは示さない事実がある。久我と直接つながるものだけを選ぼう。':'まだ足りない。サイト、鍵、映像の3つの方向から考えよう。',
-   memo:'配信の持ち主、鍵、映像の腕時計。3つがすべて久我を指している。'}
+  {type:'text',q:'犯人は誰？（名前）',
+   check:v=>/久我|くが|kuga/.test(v),
+   traps:[[/黒澄|くろすみ|レイ/,'黒澄レイには、その時間に別の場所で生配信をしていた記録がある。'],[/恋人|彼女/,'元恋人は、その夜は沖縄にいた。'],[/灯籠|とうろう/,'灯籠は302号室の鍵を持っていない。録画を渡したのも彼だ。'],[/遼|りょう|架純|かすみ|透|とおる/,'10/11 の深夜に302号室に入れたのは誰か。関係者のアリバイと鍵を確かめよう。']],
+   memo:'犯人は久我圭吾。302号室の鍵を管理していて、10/11 の深夜にアリバイがない。'},
+  {type:'choice',tag:'対決 1',q:'<span class="say">久我</span>「配信？ あれは毎晩、あの部屋のありのままを流しているだけですよ」<br>どの証拠で崩す？',
+   options:['日曜（10/18）の配信に、平日しか走らない貨物の音が入っている','黒澄レイには、大阪から生配信していた記録がある','「お別れ」は下書き保存をせずに公開された','302号室は2021年3月から募集を止めている'],answer:0,
+   why:()=>'それは、配信がライブかどうかとは関係がない。',
+   memo:'配信は10/12から録画だった。日曜の配信に、平日の貨物の音が入っていた。'},
+  {type:'choice',tag:'対決 2',q:'<span class="say">久我</span>「うつろ放送？ 噂は知っていますが、うちとは何の関係もありません」<br>どの証拠で崩す？',
+   options:['配信は10/12から過去の映像に差し替えられた','うつろ放送と久我ハウジング管理のサイトは、同じ解析アカウントを使っている','遼のスマホは04:20に電源が切れた','10/11の配信のハッシュ値は、他のどの日とも一致しない'],answer:1,
+   why:()=>'それは久我とサイトを結びつけない。持ち主が同じだと示す証拠はどれか。',
+   memo:'うつろ放送と久我ハウジング管理は同じ解析アカウント。カメラのWi-Fiは KH-CORPO-3F-E、この部屋。'},
+  {type:'choice',tag:'対決 3',q:'<span class="say">久我</span>「水野さんは、ご自分で『お別れ』を書いて出ていかれたんでしょう」<br>どの証拠で崩す？',
+   options:['遼は10/10の夜、一度中野の自宅に帰っている','管理画面の時刻はUTCで記録されている','「お別れ」が公開された03:52、遼のスマホはこの建物にあった','黒澄レイと遼は、ネタの取り合いで揉めていた'],answer:2,
+   why:i=>i===1?'それだけでは足りない。UTCを日本時間に直すと、何がわかったか。':'それでは、別の誰かが書いたことにはならない。',
+   memo:'「お別れ」は日本時間の03:52、この建物の中で、遼のスマホから別の誰かが書いた。'},
+  {type:'choice',tag:'対決 4',q:'<span class="say">久我</span>「あの夜に映ったのは、招かれた人の影ですよ。霊です」<br>どの証拠で崩す？',
+   options:['映像は左右が反転している','電源ノイズは50Hzだった','窓の外にツキミ ランドリーの看板が見える','10/11の映像の奥の男の右手首に、腕時計が光っている'],answer:3,
+   why:()=>'影が霊ではなく、生きた人間だと示すものはどれか。',
+   memo:'10/11 に映ったのは霊ではなく、スマホを持った遼と、腕時計をした男。久我は自分の右手首を押さえた。'},
+  {type:'text',tag:'最後',q:'<span class="say">久我</span>「……この部屋には、何もありませんよ」<br>どこを開けさせる？',
+   check:v=>/押入|押し入れ|おしいれ|襖|ふすま/.test(v),
+   traps:[[/天井|床|窓|外|ベランダ|浴室|風呂|トイレ|玄関|台所/,'灯籠が送ってきた「継ぎ目」を差分で重ねると、違うところだけが光る。光ったのはどこか。']],
+   memo:'継ぎ目の一コマで、押入れの襖が指一本ぶん開いていた。差し替えの作業をした夜、閉め忘れたのだろう。'}
  ],
- hints:['「継ぎ目」の「差分」ボタンを押して、2枚の画像の違いだけを表示しよう。','「関係者」でアリバイを確認しよう。10/11 の深夜に302号室に入れたのは誰か。','証拠は「誰がやったか」を示すものに限る。起きた出来事そのものは、犯人を示さない。'],
- solved:`<p>この部屋は出るんですよ、と久我は繰り返した。透は、ひとつずつ答えた。</p>
- <p>そして押入れの襖を指さした。継ぎ目の一コマで、指一本ぶん開いていた襖だ。</p>`,
+ hints:['「関係者」でアリバイと鍵を確かめよう。10/11 の深夜に302号室に入れたのは誰か。','久我の言い分ごとに、捜査ノートの「わかったこと」を見返そう。それぞれの言い分を崩せる事実が一つずつある。','最後は灯籠が送ってきた「継ぎ目」。「差分」ボタンで2枚を重ねたとき、光ったのはどこか。'],
+ solved:`<p>ドアが開き、架純と二人の刑事が入ってきた。刑事の一人が、押入れの襖を開けた。</p>
+ <p>水野遼は、そこにいた。</p>`,
  apps:[
   {id:'seam',name:'継ぎ目',icon:'diff',title:'継ぎ目のフレーム ― 灯籠から',w:580,h:470,init:initDiff,html:`<div class="seg" role="group" aria-label="表示切替"><button type="button" data-v="a" class="on">素材 03:43:59</button><button type="button" data-v="b">継ぎ目 03:43:59</button><button type="button" data-v="d">差分</button></div>
    <div class="diffbox" id="dbox"><div class="bottom">${roomSVG({noflick:true})}</div><div class="top" id="dtop" hidden>${roomSVG({seam:true,noflick:true})}</div></div>
@@ -918,7 +961,7 @@ $ open 2026_utsuro.enc
 
 // ===== 状態 =====
 const KEY='utsuro-save-v4';
-const fresh=()=>({cur:0,done:{},hints:{},nr:{}});
+const fresh=()=>({cur:0,done:{},hints:{},nr:{},seen:{}});
 let S=fresh();
 try{const s=JSON.parse(localStorage.getItem(KEY)||'null');if(s&&Number.isInteger(s.cur)&&s.cur>=0&&s.cur<CH.length&&s.done)S=Object.assign(fresh(),s)}catch(e){}
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
@@ -932,12 +975,13 @@ const media=q=>!!window.matchMedia?.(q).matches;
 const reduceMotion=media('(prefers-reduced-motion: reduce)');
 
 // ===== 捜査ノート（小問の回答） =====
+const stepLabel=(c,st,i)=>st.tag||(c.id?`Q${c.id}-${i+1}`:'序');
 function stepHTML(c,st,i){
-  const n=`<div class="num">${c.id?`Q${c.id}-${i+1}`:'序'}</div>`;
-  if(stepDone(c,i))return `<div class="done-step">${n}${st.q}<br><b>✓ ${esc(S.done[c.id+'-'+i])}</b></div>`;
+  const n=`<div class="num">${stepLabel(c,st,i)}</div>`;
+  if(stepDone(c,i))return `<div class="done-step" data-k="${c.id}-${i}">${n}${st.q}<br><b>✓ ${esc(S.done[c.id+'-'+i])}</b></div>`;
   let body='';
   if(st.type==='text')body=`<form class="ans" data-s="${i}"><input type="text" id="in-${c.id}-${i}" autocomplete="off" aria-label="回答" placeholder="答えを入力"><button class="btn" type="submit">回答する</button></form>`;
-  if(st.type==='choice')body=`<form class="ans" data-s="${i}"><select id="in-${c.id}-${i}" aria-label="選択"><option value="">選ぶ</option>${st.options.map((o,j)=>`<option value="${j}">${o}</option>`).join('')}</select><button class="btn" type="submit">回答する</button></form>`;
+  if(st.type==='choice')body=`<form data-s="${i}"><div class="opts">${st.options.map((o,j)=>`<label for="in-${c.id}-${i}-${j}"><input type="radio" name="r-${c.id}-${i}" id="in-${c.id}-${i}-${j}" value="${j}">${o}</label>`).join('')}</div><button class="btn" type="submit">${st.tag?.startsWith('対決')?'突きつける':'回答する'}</button></form>`;
   if(st.type==='multi')body=`<form data-s="${i}"><div class="opts">${st.options.map((o,j)=>`<label for="in-${c.id}-${i}-${j}"><input type="checkbox" id="in-${c.id}-${i}-${j}" value="${j}">${o}</label>`).join('')}</div><button class="btn" type="submit">回答する</button></form>`;
   return `<div class="task">${n}<div class="q">${st.q}</div>${body}<div class="feedback" id="fb-${i}"></div></div>`;
 }
@@ -948,7 +992,7 @@ function noteHTML(){
    ${hn<c.hints.length?`<button class="btn ghost sm" type="button" id="hbtn" style="align-self:flex-start">ヒントを見る（${hn+1}/${c.hints.length}）</button>`:''}</div>`;
   const last=S.cur===CH.length-1,label=S.cur===0?'2026_utsuro を開く':last?'事件ファイルを閉じる':'次の章へ';
   const sol=done?`<div class="solved"><div class="num" style="color:var(--ok);font-family:var(--f-mono);font-size:11px;letter-spacing:.12em">解明</div>${c.solved}<button class="btn" id="nx" type="button">${label}</button></div>`:'';
-  const memos=[];CH.forEach(x=>x.steps.forEach((st,i)=>{if(stepDone(x,i))memos.push(`<li><span class="mono" style="color:var(--muted)">${x.id?`Q${x.id}-${i+1}`:'序'}</span> ${st.memo}</li>`)}));
+  const memos=[];CH.forEach(x=>x.steps.forEach((st,i)=>{if(stepDone(x,i))memos.push(`<li><span class="mono" style="color:var(--muted)">${stepLabel(x,st,i)}</span> ${st.memo}</li>`)}));
   return `<div class="nt-head"><b>${c.no}　${c.title}</b><span>${c.clock} ・ ${c.where}</span></div>
    <h3>いまの疑問</h3><div class="steps">${c.steps.slice(0,shown).map((st,i)=>stepHTML(c,st,i)).join('')}${hints}${sol}</div>
    <h3>わかったこと</h3>${memos.length?`<ol class="memo-list">${memos.join('')}</ol>`:'<div class="cap">小問を解くと、わかったことがここにたまっていく。</div>'}`;
@@ -959,7 +1003,7 @@ function initNote(el){
   const hb=el.querySelector('#hbtn'); if(hb)hb.onclick=()=>{S.hints[c.id]=(S.hints[c.id]||0)+1;save();refreshNote()};
   const nx=el.querySelector('#nx'); if(nx)nx.onclick=()=>S.cur===CH.length-1?showEnding():enterChapter(S.cur+1);
 }
-function refreshNote(){const w=WIN.note;if(!w)return;const bd=w.querySelector('.bd');bd.innerHTML=noteHTML();initNote(w)}
+function refreshNote(){const w=WIN.note;if(!w)return;const bd=w.querySelector(".bd");bd.innerHTML=noteHTML();initNote(w);(bd.querySelector(".task")||bd.querySelector(".solved"))?.scrollIntoView?.({block:"nearest"})}
 function answer(c,i,f){
   const st=c.steps[i],fb=$('fb-'+i);
   const bad=m=>{fb.className='feedback bad';fb.textContent=m};
@@ -970,7 +1014,7 @@ function answer(c,i,f){
     if(!st.check(v)){const t=(st.traps||[]).find(t=>t[0].test(v));return bad(t?t[1]:'証拠と合わない。資料をもう一度見直そう。')}
     shown=raw.trim();
   }else if(st.type==='choice'){
-    const v=f.querySelector('select').value;
+    const v=f.querySelector('input:checked')?.value??'';
     if(v==='')return bad('選択肢から選んでください。');
     if(+v!==st.answer)return bad(st.why(+v));
     shown=st.options[st.answer];
@@ -981,6 +1025,7 @@ function answer(c,i,f){
     shown=st.answer.map(a=>st.options[a]).join(' ／ ');
   }
   S.done[c.id+'-'+i]=shown;save();refreshNote();renderMenu();
+  WIN.note?.querySelector(`[data-k="${c.id}-${i}"]`)?.classList.add('just');
   if(chDone(c))narrate(solvedLines(c));
   const nxt=$('in-'+c.id+'-'+(i+1))||$('in-'+c.id+'-'+(i+1)+'-0');
   if(nxt)nxt.focus({preventScroll:true});
@@ -990,11 +1035,31 @@ const solvedLines=c=>c.solved.split(/<\/p>/).map(s=>s.replace(/<[^>]+>/g,'').tri
 // ===== ウィンドウ =====
 let WIN={},zTop=10,cascade=0;
 function chatApp(c){
-  const ch=c.chat;
+  const ch=c.chat,key='chat'+c.id;
   return {id:'chat',name:'メッセージ',icon:'chat',title:`メッセージ ― ${ch.with}`,w:380,h:470,flush:true,
    html:`<div class="chathead"><span class="av">${ch.with.slice(0,1)}</span><b>${ch.with}</b></div><div class="chat">
     ${ch.msgs.map(m=>`<div class="bubble ${m[0]==='me'?'me':''}"><span class="n">${m[0]==='me'?(c.id?'透':'ミオ'):m[0]} ・ ${m[1]}</span>${m[2]}</div>`).join('')}
-    ${ch.tail?`<div class="cap" style="align-self:flex-end">${ch.tail}</div>`:''}</div>`};
+    ${ch.tail?`<div class="cap" style="align-self:flex-end">${ch.tail}</div>`:''}</div>`,
+   // 初めて開いたときだけ、入力中の表示をはさんで一通ずつ届く
+   init:el=>{
+    if(S.seen[key])return;
+    S.seen[key]=true;save();
+    document.querySelector('#icons [data-app="chat"] .badge')?.remove();
+    if(reduceMotion)return;
+    const box=el.querySelector('.chat'),items=[...box.children];
+    items.forEach(x=>x.hidden=true);
+    const typing=document.createElement('div');typing.className='bubble typing';typing.innerHTML='<i></i><i></i><i></i>';
+    let n=0;
+    const next=()=>{
+      if(!box.isConnected||n>=items.length){typing.remove();return}
+      const it=items[n++];
+      if(it.classList.contains('bubble')&&!it.classList.contains('me')){
+        typing.remove();box.insertBefore(typing,it);
+        setTimeout(()=>{typing.remove();it.hidden=false;box.parentElement.scrollTop=box.scrollHeight;setTimeout(next,350)},800);
+      }else{it.hidden=false;setTimeout(next,450)}
+    };
+    next();
+   }};
 }
 const NOTE={id:'note',name:'捜査ノート',icon:'note',title:'捜査ノート',w:420,h:600,right:true,html:noteHTML,init:initNote};
 function appsOf(c){return [...(c.chat?[chatApp(c)]:[]),...c.apps,NOTE]}
@@ -1072,7 +1137,7 @@ function renderMenu(){
   m.querySelectorAll('[data-ch]').forEach(b=>b.onclick=()=>{toggleMenu(false);enterChapter(+b.dataset.ch)});
   $('mreset').onclick=()=>{
     m.innerHTML=`<div class="confirm">進行状況を消しますか？ <button class="btn sm" type="button" id="ry">消す</button><button class="btn ghost sm" type="button" id="rn">やめる</button></div>`;
-    $('ry').onclick=()=>{S=fresh();termLog=null;MAP={sel:null,q:'',rails:true};hsel=[];save();toggleMenu(false);enterChapter(0)};
+    $('ry').onclick=()=>{S=fresh();termLog=null;termHist=[];MAP={sel:null,q:'',rails:true};hsel=[];save();toggleMenu(false);enterChapter(0)};
     $('rn').onclick=renderMenu;};
   $('mtitle').onclick=()=>{toggleMenu(false);showTitle()};
 }
@@ -1082,7 +1147,7 @@ function toast(who,text,app){
   const t=document.createElement('div');t.className='toast';t.setAttribute('role','status');
   t.innerHTML=`<span class="tile t-chat" style="width:30px;height:30px;border-radius:8px;display:grid;place-items:center;color:#fff">${icon('chat')}</span><div><b>${who}</b><span>${text}</span></div>`;
   t.onclick=()=>{t.remove();openApp(app)};
-  $('desk').appendChild(t);setTimeout(()=>t.remove(),6000);
+  $('desk').appendChild(t);setTimeout(()=>t.remove(),9000);
 }
 function enterChapter(i,withCard=true){
   if(!unlocked(i))i=0;
@@ -1091,12 +1156,13 @@ function enterChapter(i,withCard=true){
   Object.values(WIN).forEach(w=>w.remove());WIN={};cascade=0;
   $('screen').className=c.theme;$('desk').dataset.mark=c.mark;$('wall').innerHTML=WALL[c.theme];
   $('clock').innerHTML=c.clock.replace(' ','<br>');
-  $('icons').innerHTML=appsOf(c).map(a=>`<button type="button" data-app="${a.id}"><span class="tile t-${a.icon}">${icon(a.icon)}</span><span class="lb">${a.name}</span></button>`).join('');
+  const unread=a=>a.id==='chat'&&!S.seen['chat'+c.id];
+  $('icons').innerHTML=appsOf(c).map(a=>`<button type="button" data-app="${a.id}"><span class="tile t-${a.icon}">${icon(a.icon)}${unread(a)?'<i class="badge" aria-label="未読"></i>':''}</span><span class="lb">${a.name}</span></button>`).join('');
   $('icons').querySelectorAll('[data-app]').forEach(b=>b.onclick=()=>openApp(b.dataset.app));
   openApp('note');c.open.forEach(openApp);
   if(chDone(c))narrate(solvedLines(c));
   else narrate(c.narr,Number.isInteger(S.nr[c.id])?S.nr[c.id]:0,c.id);
-  if(c.chat&&!chDone(c)){const m=c.chat.msgs[0];setTimeout(()=>toast(m[0],m[2].replace(/<br>/g,' ').slice(0,40)+'…','chat'),400)}
+  if(c.chat&&!S.seen['chat'+c.id]){const m=c.chat.msgs[0];setTimeout(()=>toast(m[0],m[2].replace(/<br>/g,' ').slice(0,40)+'…','chat'),400)}
   renderMenu();
   if(withCard)showCard(c,from===0&&i===1);
 }
@@ -1121,10 +1187,8 @@ function endingHTML(){
   return `<div class="ending">
    <div class="eyebrow">解決</div>
    <h2>招かれた者</h2>
-   <p>「この部屋は出るんですよ」と久我は繰り返した。透はひとつずつ答えた。</p>
-   <p>配信はライブではない。日曜に平日の貨物の音が入っている。ハッシュ値は3日ごとに一致する。サイトの解析IDはあなたの会社と同じ。別れの投稿は、遼のスマホから別の誰かが書いた。そして10/11に映った「人」は霊ではなく、生きていた水野遼と、腕時計をしたあなただ。</p>
-   <p>最後に、ループの継ぎ目。そこだけ押入れの襖が指一本ぶん開いていた。差し替えの作業をした夜、閉め忘れたのだろう。</p>
-   <p>押入れの中で、遼は見つかった。5年前、同じ部屋で亡くなった宮下沙耶の死も、自殺ではなかったことが後にわかる。遼は、灯籠が保存していた5年前の録画に映る男の腕時計から、久我にたどり着いていた。</p>
+   <p>「あの人も、時計を見たんですよ」。久我圭吾は窓の外を見たまま、それだけ言った。その場で逮捕された。</p>
+   <p>5年前、同じ部屋で亡くなった宮下沙耶の死も、自殺ではなかったことが後にわかる。遼は、灯籠が保存していた5年前の録画に映る男の腕時計から、久我にたどり着いていた。</p>
    <div class="epi">
     <div class="eyebrow" style="color:#8fa4c9">その後</div>
     <p>サーバーは押収され、カメラも撤去された。</p>
@@ -1135,6 +1199,10 @@ function endingHTML(){
     <div class="frame"><span class="who2">2036 ・ ミオ</span>ファイルの最後のページには、二十歳の透さんの字で一行だけ書いてあった。「この仕事を続ける。理由はまだうまく書けない」</div>
     <p>翌年、透さんは大学を辞めて、最初の事務所を開いた。最初の依頼人は灯籠さんで、最初の協力者は、警察官を目指すと言い出した水野架純さんだった。</p>
     <p>その架純さんが今、透さんを取り調べている。「架純には連絡するな」の意味は、まだわからない。</p>
+    <p>私はもう一度、透さんの逮捕を伝えたニュースを開いた。記事に添えられていた、透さんのアカウントの投稿のスクリーンショット。</p>
+    <p class="mono">全部俺がやった.</p>
+    <p>文末が、半角のピリオドになっていた。透さんは、日本語の文章を必ず全角の「。」で終える。四年間、報告書を清書してきた私が、一番よく知っている。十年前、水野遼さんの「お別れ」を偽物だと見抜いたのも、こういう小さな癖だった。</p>
+    <p>同じ手口が、もう一度使われている。そして透さんは、自分の口からは言えない何かを抱えている。</p>
     <p>ファイルを閉じたのは、午前3時を少し過ぎたころだった。</p>
     <p>事務所の連絡用アカウントに、メッセージが一通届いた。送り主は、三年前から連絡の途絶えていた灯籠さん。本文はなく、URLがひとつだけ。<span class="mono">utsuro.tv</span>。十年前にサーバーごと押収されて、ドメインも失効したはずのサイト。</p>
     <p>3時33分。黒い画面がふっと明るくなる。</p>
