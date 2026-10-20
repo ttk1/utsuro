@@ -42,6 +42,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,[tabindex]:focus-v
   color-scheme:light;
 }
 #desk{position:relative;overflow:hidden;background:var(--wall)}
+#wall{position:absolute;inset:0;pointer-events:none}
+#wall svg{width:100%;height:100%;display:block}
 #desk::after{content:attr(data-mark);position:absolute;right:28px;bottom:150px;font-family:var(--f-mono);font-size:clamp(28px,6vw,64px);letter-spacing:.08em;color:currentColor;opacity:.05;pointer-events:none}
 
 /* ===== デスクトップのアイコン ===== */
@@ -210,7 +212,7 @@ tr.pick:hover td{background:var(--surface2)}
 .mapapp{background:var(--map-land);display:flex;flex-direction:column;--fg:#d8dae6;--muted:#8b91aa;color:var(--fg)}
 .mapbar{display:flex;gap:8px;padding:8px;border-bottom:1px solid #2a3044;flex-wrap:wrap;background:#1b2032}
 .mapbar input{flex:1 1 160px;min-width:0;background:#0c0e16;color:var(--fg);border:1px solid #2a3044;padding:7px 12px;font:inherit;border-radius:18px}
-.mapbar label{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted)}
+.mapbar label{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted);white-space:nowrap}
 .results{display:flex;flex-direction:column;border-bottom:1px solid #2a3044}
 .results:empty{display:none}
 .results button{text-align:left;background:transparent;color:var(--fg);border:0;border-bottom:1px solid #2a3044;padding:7px 12px;cursor:pointer;font-size:13px}
@@ -282,6 +284,7 @@ tr.pick:hover td{background:var(--surface2)}
 
 <div id="screen" class="y2026">
   <div id="desk">
+    <div id="wall" aria-hidden="true"></div>
     <nav id="icons" aria-label="アプリ"></nav>
     <div id="wins"></div>
     <div id="narr" role="region" aria-label="語り" aria-live="polite"></div>
@@ -313,17 +316,50 @@ function roomSVG(o={}){
   const id='vg'+(svgN++);
   const k=o.dark?0.38:1;
   const c=(r,g,b)=>`rgb(${Math.round(r*k)},${Math.round(g*k)},${Math.round(b*k)})`;
+  // 10/11 の二人。壁（約 11）よりわずかに明るいだけの色で描き、明るさ補正をかけて初めて形がわかるようにする
+  // 奥の男（久我）は窓の外の踏切に頭が重ならない位置に立つ。右手首に腕時計、手前の遼は胸の前でスマホを握る
   const fig=o.figures?`
-    <path d="M392 330 L398 190 Q400 160 418 152 Q412 132 424 120 Q440 110 452 124 Q460 140 450 154 Q470 162 472 192 L478 330 Z" fill="rgb(16,17,23)"/>
-    <path d="M470 196 L488 250 L480 254 L464 210 Z" fill="rgb(17,18,24)"/>
-    <rect x="478" y="240" width="9" height="6" fill="rgb(31,29,21)"/>
-    <path d="M250 330 L256 205 Q258 178 274 172 Q268 152 280 142 Q294 134 304 146 Q310 160 302 172 Q320 180 322 206 L328 330 Z" fill="rgb(15,16,22)"/>
-    <rect x="318" y="212" width="11" height="8" fill="rgb(28,33,42)"/>`:'';
+    <g filter="url(#${id}b)" fill="rgb(13,13,16)">
+      <g transform="translate(36 0)">
+        <ellipse cx="436" cy="137" rx="15" ry="19"/>
+        <path d="M429 152 L443 152 L444 160 Q458 162 465 174 Q470 190 466 236 L471 330 L403 330 L408 236 Q404 190 409 174 Q416 162 428 160 Z"/>
+        <path d="M411 176 Q400 214 404 254 L411 254 Q410 218 419 186 Z"/>
+        <path d="M461 172 Q476 198 482 232 L490 230 Q483 194 467 168 Z"/>
+        <ellipse cx="487.5" cy="244" rx="4.4" ry="7" transform="rotate(-14 487.5 244)"/>
+      </g>
+      <ellipse cx="290" cy="162" rx="14" ry="17"/>
+      <path d="M284 176 L296 176 L297 183 Q309 186 315 197 Q319 212 316 250 L320 330 L260 330 L264 250 Q261 212 265 197 Q271 186 283 183 Z"/>
+      <path d="M267 197 Q258 228 262 262 L269 262 Q267 232 274 206 Z"/>
+      <path d="M311 197 Q322 216 314 236 L303 240 L302 233 L307 230 Q311 218 304 205 Z"/>
+    </g>
+    <circle cx="300" cy="230" r="13" fill="url(#${id}p)"/>
+    <g transform="rotate(-12 300 230)">
+      <rect x="295.5" y="223" width="9" height="15" rx="1.8" fill="rgb(12,12,14)"/>
+      <rect x="296.6" y="224.4" width="6.8" height="12" rx=".8" fill="rgb(24,30,40)"/>
+      <rect x="297.4" y="226" width="5" height="1" fill="rgb(30,38,50)"/><rect x="297.4" y="228.4" width="3.6" height="1" fill="rgb(30,38,50)"/>
+    </g>
+    <ellipse cx="303.5" cy="236.5" rx="3.6" ry="2.4" fill="rgb(13,13,16)" transform="rotate(-25 303.5 236.5)"/>
+    <ellipse cx="295.6" cy="231" rx="1.6" ry="3.2" fill="rgb(13,13,16)"/>
+    <g transform="translate(36 0)">
+      <g transform="rotate(-20 485.5 232)">
+        <rect x="478" y="229.1" width="15" height="5.8" rx="1.4" fill="rgb(21,21,23)"/>
+        ${[480.4,482.6,488.4,490.6].map(x=>`<line x1="${x}" y1="229.3" x2="${x}" y2="234.7" stroke="rgb(28,28,30)" stroke-width=".5"/>`).join('')}
+      </g>
+      <circle cx="485.5" cy="232" r="5" fill="rgb(16,16,19)" stroke="rgb(29,28,26)" stroke-width="1.4"/>
+      <circle cx="485.5" cy="232" r="3.3" fill="rgb(21,22,25)"/>
+      <path d="M485.5 232 L485.5 229.6 M485.5 232 L487.2 232.8" stroke="rgb(30,30,29)" stroke-width=".55"/>
+      <ellipse cx="483.6" cy="230" rx="1.4" ry=".8" fill="rgb(48,46,39)"/>
+    </g>`:'';
+  // 暗い映像のノイズ。明るさを上げると浮き出る
+  const grain=o.dark?`<rect width="640" height="360" filter="url(#${id}n)" opacity=".09"/>`:'';
   const gap=o.seam?14:3;
   const seam=`<rect x="${152-gap/2}" y="128" width="${gap}" height="150" fill="${c(8,8,10)}"/>`+(o.seam?`<path d="M149 214 q3 -6 6 0 q-1 8 -6 10z" fill="${c(120,116,104)}"/>`:'');
   const fl=o.noflick?'':'flick';
   return `<svg viewBox="0 0 640 360" role="img" aria-label="うつろ放送の配信画面。薄暗い和室">
-  <defs><radialGradient id="${id}" cx="50%" cy="50%" r="70%"><stop offset="60%" stop-color="#000" stop-opacity="0"/><stop offset="100%" stop-color="#000" stop-opacity=".7"/></radialGradient></defs>
+  <defs><radialGradient id="${id}" cx="50%" cy="50%" r="70%"><stop offset="60%" stop-color="#000" stop-opacity="0"/><stop offset="100%" stop-color="#000" stop-opacity=".7"/></radialGradient>
+   <radialGradient id="${id}p"><stop offset="0%" stop-color="rgb(30,38,52)" stop-opacity=".35"/><stop offset="100%" stop-color="rgb(30,38,52)" stop-opacity="0"/></radialGradient>
+   <filter id="${id}b" x="-10%" y="-10%" width="120%" height="120%"><feGaussianBlur stdDeviation=".9"/></filter>
+   <filter id="${id}n"><feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="2" seed="11"/><feColorMatrix type="saturate" values="0"/></filter></defs>
   <rect width="640" height="360" fill="${c(28,30,40)}"/>
   <polygon points="0,290 640,290 640,360 0,360" fill="${c(44,46,34)}"/>
   ${[0,1,2,3,4].map(i=>`<line x1="${i*160}" y1="290" x2="${i*160-40}" y2="360" stroke="${c(30,32,24)}" stroke-width="2"/>`).join('')}
@@ -354,6 +390,7 @@ function roomSVG(o={}){
   <rect x="412" y="196" width="182" height="3" fill="${c(60,60,70)}"/>
   <ellipse cx="330" cy="318" rx="60" ry="14" fill="${c(80,40,40)}"/>
   ${fig}
+  ${grain}
   <rect width="640" height="360" fill="url(#${id})"/>
 </svg>`;
 }
@@ -368,9 +405,9 @@ const PLACES=[
  {id:'X',name:'月見台第一踏切',kind:'踏切',x:170,y:255,addr:'東湾線 月見台駅〜湾岸台駅',info:[['路線','東湾線・東湾貨物線']],rev:[[3,'開かずの踏切ってほどではない。深夜も貨物が通る。']]},
  {id:'S',name:'月見台駅',kind:'駅',x:170,y:430,addr:'東湾線',info:[['路線','東湾線（旅客）、東湾貨物線が並走']],rev:[]},
  {id:'K',name:'久我ハウジング管理 月見台店',kind:'不動産会社',x:520,y:200,addr:'月見台二丁目 2-5',info:[['営業','10:00〜19:00'],['定休','水曜']],rev:[[5,'担当の久我さんがとても親切。時計の話をしたら止まらなかった。']]},
- {id:'M',name:'ヨルマート 月見台店',kind:'コンビニ',x:250,y:200,addr:'月見台二丁目 3-1',info:[['営業','24時間']],rev:[[3,'深夜の店員さんがいつも眠そう。']]},
+ {id:'M',name:'ヨルマート 月見台店',kind:'コンビニ',x:215,y:130,addr:'月見台二丁目 3-1',info:[['営業','24時間']],rev:[[3,'深夜の店員さんがいつも眠そう。']]},
  {id:'D',name:'コインランドリー月見',kind:'コインランドリー',x:600,y:92,addr:'月見台五丁目 1-3',info:[['営業','6:00〜24:00'],['看板','「コインランドリー月見」']],rev:[[3,'北総線の高架の下。電車が通ると揺れる。']]},
- {id:'H',name:'ハイツ北総',kind:'アパート',x:640,y:40,addr:'月見台五丁目 1-9',info:[['階数','4階建て'],['窓','南向き'],['管理','北総エステート']],rev:[[2,'高架の真横。夜中の貨物で目が覚める。']]},
+ {id:'H',name:'ハイツ北総',kind:'アパート',x:688,y:62,addr:'月見台五丁目 1-9',info:[['階数','4階建て'],['窓','南向き'],['管理','北総エステート']],rev:[[2,'高架の真横。夜中の貨物で目が覚める。']]},
  {id:'P',name:'月見台公園',kind:'公園',x:470,y:420,addr:'月見台三丁目',info:[],rev:[[4,'夜は暗いので注意。']]},
 ];
 const kata=s=>norm(s).replace(/[ぁ-ゖ]/g,ch=>String.fromCharCode(ch.charCodeAt(0)+0x60));
@@ -453,7 +490,7 @@ function initDiff(){
 // ===== 明るさ補正 =====
 function initBright(){
   const br=document.getElementById('br');
-  const f=()=>{const v=+br.value;document.querySelector('#enh svg').style.filter=`brightness(${v}) contrast(${1+(v-1)*.3}) saturate(${1-(v-1)*.1})`;document.getElementById('brv').textContent='×'+v.toFixed(1)};
+  const f=()=>{const v=+br.value;document.querySelector('#enh svg').style.filter=`brightness(${v}) contrast(${1+(v-1)*.15}) saturate(${1-(v-1)*.1})`;document.getElementById('brv').textContent='×'+v.toFixed(1)};
   br.oninput=f;f();
 }
 
@@ -588,6 +625,46 @@ const icon=n=>`<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${ICON[n]}
 const browser=(url,inner)=>`<div class="addr">${icon('web')}<span>${url}</span></div><div class="page">${inner}</div>`;
 const M='ミオ';
 
+// ===== 壁紙 =====
+// 2026年: 透のノートPC。ハンドル名 ghostwire から、配線で描いた幽霊と、魚拓集めの趣味を表すアーカイブの年表
+// 2036年: ミオの事務所の端末。窓から見える首都高と、ハッカーだった過去を思わせるネットワーク図
+const WALL={
+ y2026:(()=>{
+  const ghost='M970 640 V420 A180 180 0 0 1 1330 420 V640 L1285 605 L1240 640 L1195 605 L1150 640 L1105 605 L1060 640 L1015 605 Z';
+  const traces=['M1015 605 V500 H1060 V455','M1105 605 V545 H1150 V505','M1195 605 V520 H1240 V470','M1285 605 V560',
+   'M1330 470 H1430 V420 H1600','M1330 560 H1470 V610 H1600','M970 500 H860 V540 H740','M1150 240 V170 H1230 V0','M1060 268 V210 H990 V120'];
+  const pads=[[1060,455],[1150,505],[1240,470],[1285,560],[740,540],[990,120]];
+  const years=['2004','2009','2013','2017','2021','2026'];
+  return `<svg viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice">
+   <g fill="none" stroke="#7f9fd9" stroke-width="2" opacity=".17">
+    <path d="${ghost}"/>${traces.map(d=>`<path d="${d}"/>`).join('')}
+    ${pads.map(([x,y])=>`<circle cx="${x}" cy="${y}" r="6"/>`).join('')}
+    <rect x="1080" y="395" width="26" height="44" rx="3"/><rect x="1194" y="395" width="26" height="44" rx="3"/>
+   </g>
+   <g opacity=".13" fill="#9fb3d8"><text x="1150" y="720" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="44" letter-spacing="6">ghostwire</text>
+   </g>
+   <g opacity=".2" fill="#9fb3d8" font-family="IBM Plex Mono, monospace" font-size="15">
+    <line x1="140" y1="700" x2="840" y2="700" stroke="#9fb3d8" stroke-width="1.5"/>
+    ${years.map((y,i)=>`<circle cx="${160+i*132}" cy="700" r="${i===years.length-1?7:5}" ${i===years.length-1?'fill="none" stroke="#9fb3d8" stroke-width="2"':''}/><text x="${160+i*132}" y="730" text-anchor="middle">${y}</text>`).join('')}
+    <text x="140" y="672" font-size="13">snapshots / 消えたサイトの魚拓</text>
+   </g></svg>`;
+ })(),
+ y2036:(()=>{
+  const nodes=[[980,120],[1090,90],[1180,170],[1300,110],[1400,200],[1250,260],[1120,250],[1480,90],[1530,250]];
+  const edges=[[0,1],[1,2],[1,3],[2,5],[2,6],[3,4],[3,7],[4,5],[4,8],[5,6],[0,6]];
+  const towers=[[0,520,90],[100,470,70],[180,540,110],[300,430,80],[390,500,120],[520,460,70],[600,410,100],[720,490,90],[820,440,120],[950,500,80],[1040,420,110],[1160,480,90],[1260,450,120],[1390,500,90],[1490,430,110]];
+  return `<svg viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice">
+   <g fill="#56636f" opacity=".1">${towers.map(([x,y,w])=>`<rect x="${x}" y="${y}" width="${w}" height="${900-y}"/>`).join('')}</g>
+   <g fill="#4d5a66" opacity=".16">${[60,260,460,660,860,1060,1260,1460].map(x=>`<rect x="${x}" y="${646-x*.045}" width="26" height="${260+x*.045}"/>`).join('')}</g>
+   <path d="M0 650 C420 632 980 602 1600 576" fill="none" stroke="#4d5a66" stroke-width="22" opacity=".2"/>
+   <path d="M0 628 C420 610 980 580 1600 554" fill="none" stroke="#4d5a66" stroke-width="3" opacity=".2"/>
+   <g stroke="#4a5866" stroke-width="1.5" opacity=".22">${edges.map(([a,b])=>`<line x1="${nodes[a][0]}" y1="${nodes[a][1]}" x2="${nodes[b][0]}" y2="${nodes[b][1]}"/>`).join('')}</g>
+   <g fill="#f4f5f6" stroke="#4a5866" stroke-width="2" opacity=".35">${nodes.map(([x,y],i)=>`<circle cx="${x}" cy="${y}" r="${i===4?8:5}"/>`).join('')}</g>
+   <circle cx="1400" cy="200" r="16" fill="none" stroke="#b8740f" stroke-width="2" opacity=".45"/>
+  </svg>`;
+ })(),
+};
+
 // ===== 章データ =====
 // narr: 語り [話し手, 本文, 'frame'＝2036年のミオ]。chat: チャットアプリの会話。apps: デスクトップのアプリ。open: 章の始めに開くアプリ
 const CH=[
@@ -634,7 +711,7 @@ $ open 2026_utsuro.enc
  ]
 },
 {
- id:1,no:'第一章',title:'別れの投稿',theme:'y2026',mark:'ghostwire',clock:'2026/10/19 01:12',where:'情報工学棟 7階 研究室',
+ id:1,no:'第一章',title:'別れの投稿',theme:'y2026',mark:'',clock:'2026/10/19 01:12',where:'情報工学棟 7階 研究室',
  narr:[[M,'「ログは嘘をつかない」。透さんが最初にそれを知ったのは、二十歳のとき、後輩から届いたメッセージがきっかけだったという。','frame'],
   ['','2026年10月19日、月曜日。午前一時を過ぎた情報工学棟の七階には、篠宮透のほかに誰もいなかった。'],
   ['','スマホが震えた。ゼミの一つ下の後輩、水野架純からだった。'],
@@ -688,7 +765,7 @@ $ open 2026_utsuro.enc
  ]
 },
 {
- id:2,no:'第二章',title:'うつろの部屋',theme:'y2026',mark:'ghostwire',clock:'2026/10/20 03:33',where:'透のアパート',
+ id:2,no:'第二章',title:'うつろの部屋',theme:'y2026',mark:'',clock:'2026/10/20 03:33',where:'透のアパート',
  narr:[[M,'透さんは今でも、窓のある部屋の写真を見るとまず時計を探す。癖になったのはこの夜からだと、笑っていた。','frame'],
   ['','10月20日、火曜日。午前三時三十二分。透は自分のアパートで、明かりを消してノートパソコンの前に座っていた。'],
   ['','3時33分。ブックマークを開くと、黒い画面がふっと明るくなった。'],
@@ -737,7 +814,7 @@ $ open 2026_utsuro.enc
  ]
 },
 {
- id:3,no:'第三章',title:'サイトの持ち主',theme:'y2026',mark:'ghostwire',clock:'2026/10/20 14:05',where:'情報工学棟 7階 研究室',
+ id:3,no:'第三章',title:'サイトの持ち主',theme:'y2026',mark:'',clock:'2026/10/20 14:05',where:'情報工学棟 7階 研究室',
  narr:[[M,'「当時はまだ、手作りのスクリプトで調べてたんだよ」。ファイルには、学生だった透さんのシェル履歴がそのまま残っていた。','frame'],
   ['','建物はわかった。次は部屋と、この配信を続けている人間だ。'],
   ['','サイトは消えても、痕跡は残る。ソースのコメント、ドメインの登録記録、誰かが保存した古い版。遼のPCには、彼が途中まで打ったコマンドの履歴も残っていた。'],
@@ -765,7 +842,7 @@ $ open 2026_utsuro.enc
  ]
 },
 {
- id:4,no:'第四章',title:'録画マニア',theme:'y2026',mark:'ghostwire',clock:'2026/10/22 01:00',where:'月見台駅前 ファミリーレストラン',
+ id:4,no:'第四章',title:'録画マニア',theme:'y2026',mark:'',clock:'2026/10/22 01:00',where:'月見台駅前 ファミリーレストラン',
  narr:[[M,'灯籠さんの名前は、事務所の連絡先に今も残っている。透さんとの最後のやりとりは、三年前で止まっていた。','frame'],
   ['','その夜、透は廃墟アーカイブ掲示板に書き込んだ。過去の配信の録画を探しています。返信は、配信が終わった三時四十四分に来た。'],
   ['透','ライブの映像なら、同じ部屋でも毎晩ノイズが違うので、ハッシュ値は重ならない。1文字でも違えば別のデータ。完全に一致すれば、同じデータがもう一度流されたということだ。']],
@@ -800,7 +877,7 @@ $ open 2026_utsuro.enc
  ]
 },
 {
- id:5,no:'第五章',title:'招かれた者',theme:'y2026',mark:'ghostwire',clock:'2026/10/22 18:25',where:'コーポ月見台 302号室',
+ id:5,no:'第五章',title:'招かれた者',theme:'y2026',mark:'',clock:'2026/10/22 18:25',where:'コーポ月見台 302号室',
  narr:[[M,'この先を話すとき、透さんはいつも少しだけ黙った。そして必ず、最後に花の話をした。','frame'],
   ['','その日の昼、灯籠からもう一通メッセージが届いていた。'],
   ['','302号室の内見を申し込んだ。久我は鍵を手に、にこやかに現れた。銀色の腕時計が、袖口からのぞいている。'],
@@ -1012,7 +1089,7 @@ function enterChapter(i,withCard=true){
   const from=S.cur;S.cur=i;save();
   const c=CH[i];
   Object.values(WIN).forEach(w=>w.remove());WIN={};cascade=0;
-  $('screen').className=c.theme;$('desk').dataset.mark=c.mark;
+  $('screen').className=c.theme;$('desk').dataset.mark=c.mark;$('wall').innerHTML=WALL[c.theme];
   $('clock').innerHTML=c.clock.replace(' ','<br>');
   $('icons').innerHTML=appsOf(c).map(a=>`<button type="button" data-app="${a.id}"><span class="tile t-${a.icon}">${icon(a.icon)}</span><span class="lb">${a.name}</span></button>`).join('');
   $('icons').querySelectorAll('[data-app]').forEach(b=>b.onclick=()=>openApp(b.dataset.app));
