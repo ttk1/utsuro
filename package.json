@@ -1,0 +1,6 @@
+{
+  "name": "utsuro",
+  "private": true,
+  "scripts": { "test": "node tools/playthrough.test.js" },
+  "devDependencies": { "jsdom": "24.1.0" }
+}

@@ -1,0 +1,54 @@
+# ローカルで遊ぶ:     docker compose up      → http://localhost:8080/
+# 通しプレイのテスト: docker compose run --rm test
+# イメージを更新するときは、公開から7日以上たったものをダイジェストで固定する。
+x-hardening: &hardening
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+
+x-node: &node
+  <<: *hardening
+  image: node:24-alpine@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1
+  profiles: [test]
+
+services:
+  # game/ を読み取り専用で配信する。127.0.0.1 だけで待ち受ける
+  web:
+    <<: *hardening
+    image: nginx:1.30.5-alpine@sha256:0985e772fb9f729e6fa0980da05fca5d9c468e870eed43071545afa9d2e27d94
+    entrypoint: [nginx, -g, daemon off;]
+    user: "101:101"
+    read_only: true
+    tmpfs: [/tmp]
+    ports: ["127.0.0.1:8080:8080"]
+    volumes:
+      - ./game:/usr/share/nginx/html:ro
+      - ./tools/nginx.conf:/etc/nginx/nginx.conf:ro
+
+  # 依存を package-lock.json の integrity で検証して入れる。リポジトリには書き込まない
+  deps:
+    <<: *node
+    working_dir: /deps
+    volumes:
+      - ./package.json:/deps/package.json:ro
+      - ./package-lock.json:/deps/package-lock.json:ro
+      - ./.npmrc:/deps/.npmrc:ro
+      - node_modules:/deps/node_modules
+    command: npm ci --no-audit --no-fund
+
+  # テスト本体はネットワークなし・読み取り専用
+  test:
+    <<: *node
+    user: node
+    network_mode: none
+    read_only: true
+    working_dir: /work
+    volumes:
+      - .:/work:ro
+      - node_modules:/node_modules:ro
+    command: node tools/playthrough.test.js
+    depends_on:
+      deps:
+        condition: service_completed_successfully
+
+volumes:
+  node_modules:

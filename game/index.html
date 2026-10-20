@@ -1,0 +1,1088 @@
+<!doctype html>
+<html lang="ja">
+<meta charset="utf-8">
+<!-- 外から読むのは Google Fonts だけ。GitHub Pages ではヘッダーを付けられないので meta で指定する -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>無人放送</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700;800&family=Zen+Kaku+Gothic+New:wght@400;700&family=IBM+Plex+Mono:wght@400;500&family=DotGothic16&display=swap">
+<style>
+/* 画面内デスクトップ型。2026年は透のノートPC（深夜の暗いテーマ）、2036年はミオの事務所の端末（明るいテーマ） */
+:root{
+  --f-display:"Shippori Mincho","Hiragino Mincho ProN","Yu Mincho",serif;
+  --f-ui:system-ui,-apple-system,"Hiragino Sans","Yu Gothic UI","Meiryo",sans-serif;
+  --f-body:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  --f-dot:"DotGothic16","IBM Plex Mono",monospace;
+  --map-land:#171c29; --map-block:#1f2536; --map-road:#2e3650; --map-rail:#9aa3c2;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0;height:100%;background:#000}
+body{font-family:var(--f-ui);font-size:14px;line-height:1.7;overflow:hidden}
+button{font:inherit}
+button:focus-visible,input:focus-visible,select:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.ic{width:1em;height:1em;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;flex:none}
+
+/* ===== テーマ ===== */
+#screen{position:fixed;inset:0;display:grid;grid-template-rows:minmax(0,1fr) 44px;grid-template-columns:minmax(0,1fr);color:var(--fg)}
+#screen.y2026{
+  --win:#1f2024; --tb:#2a2c31; --tb-on:#33363c; --bg:#141518; --surface:#1f2024; --surface2:#2a2c31; --line:#383b42;
+  --fg:#e4e4e7; --muted:#9a9ca5; --accent:#e5a13f; --accent-dim:#6e5124; --red:#e8777b; --ok:#7fb59a; --ok-bg:#16201d; --task-bg:#221d14;
+  --focus:#5b8def; --bar:rgba(10,11,14,.94); --bar-fg:#cfd1d6; --icon-fg:#e9eaee;
+  --wall:radial-gradient(1100px 700px at 72% 28%,#1c2940 0%,#0d1119 58%,#06080c 100%);
+  color-scheme:dark;
+}
+#screen.y2036{
+  --win:#fbfbfa; --tb:#e9e8e4; --tb-on:#f4f3f0; --bg:#ffffff; --surface:#f4f3f0; --surface2:#ebe9e4; --line:#d6d3cc;
+  --fg:#1f2126; --muted:#666a74; --accent:#a8670b; --accent-dim:#e3c48f; --red:#b83f44; --ok:#2f7d5b; --ok-bg:#e8f3ee; --task-bg:#fbf5ea;
+  --focus:#2f6fe0; --bar:rgba(246,246,244,.95); --bar-fg:#23262c; --icon-fg:#1d2026;
+  --wall:linear-gradient(165deg,#d5dde4 0%,#aebac6 100%);
+  color-scheme:light;
+}
+#desk{position:relative;overflow:hidden;background:var(--wall)}
+#desk::after{content:attr(data-mark);position:absolute;right:28px;bottom:150px;font-family:var(--f-mono);font-size:clamp(28px,6vw,64px);letter-spacing:.08em;color:currentColor;opacity:.05;pointer-events:none}
+
+/* ===== デスクトップのアイコン ===== */
+#icons{position:absolute;left:12px;top:12px;bottom:150px;display:flex;flex-direction:column;flex-wrap:wrap;align-content:flex-start;gap:6px}
+#icons button{width:84px;display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 2px;background:transparent;border:1px solid transparent;border-radius:6px;color:var(--icon-fg);cursor:pointer;font-size:12px;line-height:1.35}
+#icons button:hover{background:rgba(127,140,170,.16);border-color:rgba(127,140,170,.25)}
+#icons .tile{width:44px;height:44px;border-radius:11px;display:grid;place-items:center;color:#fff;font-size:24px;box-shadow:0 2px 6px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.25)}
+.y2026 #icons span.lb{text-shadow:0 1px 3px #000}
+.t-chat{background:linear-gradient(#3fb37f,#23875c)} .t-web{background:linear-gradient(#5b8def,#3561c2)} .t-map{background:linear-gradient(#e0a64a,#b67718)}
+.t-term{background:linear-gradient(#3a3d45,#1c1e22)} .t-rec{background:linear-gradient(#d65a5f,#a3343a)} .t-wave{background:linear-gradient(#8b6fd6,#5f45a8)}
+.t-sheet{background:linear-gradient(#45a3a3,#2a7676)} .t-note{background:linear-gradient(#f0cf6a,#c99a22);color:#3b2d06} .t-doc{background:linear-gradient(#9aa3b5,#6b7487)}
+.t-pin{background:linear-gradient(#e66f8f,#b44463)} .t-diff{background:linear-gradient(#59b5d9,#2d84a8)} .t-people{background:linear-gradient(#b08a66,#7f5d3d)}
+.t-lock{background:linear-gradient(#59606e,#323844)} .t-news{background:linear-gradient(#d0d4dc,#9aa1ae);color:#1f2329} .t-image{background:linear-gradient(#7fae5d,#557f37)}
+
+/* ===== ウィンドウ ===== */
+.win{position:absolute;display:flex;flex-direction:column;background:var(--win);border:1px solid var(--line);border-radius:8px;box-shadow:0 18px 50px rgba(0,0,0,.45),0 2px 8px rgba(0,0,0,.25);overflow:hidden;resize:both;min-width:260px;min-height:160px}
+.win[hidden]{display:none}
+.win .tb{flex:none;display:flex;align-items:center;gap:6px;height:34px;padding:0 4px 0 12px;background:var(--tb);border-bottom:1px solid var(--line);cursor:grab;user-select:none;touch-action:none}
+.win.on .tb{background:var(--tb-on)}
+.win .ti{flex:1;display:flex;align-items:center;gap:8px;min-width:0;font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.win.on .ti{color:var(--fg)}
+.win .wb{width:30px;height:26px;display:grid;place-items:center;background:transparent;border:0;border-radius:4px;color:var(--muted);cursor:pointer;font-size:16px;line-height:1}
+.win .wb:hover{background:var(--surface2);color:var(--fg)}
+.win .wb.x:hover{background:#c8414a;color:#fff}
+.win .bd{flex:1;min-height:0;overflow:auto;padding:16px 18px;display:flex;flex-direction:column;gap:12px}
+.win .bd.flush{padding:0;gap:0}
+.addr{flex:none;display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--surface2);border-bottom:1px solid var(--line);font-family:var(--f-mono);font-size:12px;color:var(--muted);white-space:nowrap;overflow-x:auto}
+.addr span{flex:1;background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:2px 12px}
+.page{padding:14px 16px;display:flex;flex-direction:column;gap:12px}
+
+/* ===== 語り（テキストバー） ===== */
+#narr{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);width:min(860px,calc(100% - 24px));z-index:5000;background:rgba(9,10,14,.94);color:#ecebe6;border:1px solid #3b3e47;border-radius:8px;box-shadow:0 12px 34px rgba(0,0,0,.5);padding:12px 16px 10px 18px;cursor:pointer}
+#narr[hidden]{display:none}
+#narr .who{font-family:var(--f-ui);font-size:12px;color:#d9a650;letter-spacing:.06em;min-height:1.2em}
+#narr .who.frame{color:#9fb3d8}
+#narr .txt{font-family:var(--f-display);font-size:16.5px;line-height:1.85;min-height:3.7em}
+#narr .txt.frame{color:#c3cfe6}
+#narr .ctl{display:flex;align-items:center;gap:4px;justify-content:flex-end;margin-top:2px}
+#narr .ctl span{flex:1;font-size:11.5px;color:#8e919b}
+#narr .ctl button{background:transparent;border:1px solid #3b3e47;color:#c9cbd1;border-radius:4px;padding:1px 10px;cursor:pointer;font-size:12px}
+#narr .more{display:inline-block;margin-left:6px;color:#d9a650;animation:blink 1.1s steps(2) infinite}
+@keyframes blink{50%{opacity:0}}
+
+/* ===== タスクバー ===== */
+#bar{display:flex;align-items:center;gap:4px;padding:0 8px;background:var(--bar);color:var(--bar-fg);border-top:1px solid rgba(127,127,127,.25);position:relative;z-index:6000}
+#bar button{display:flex;align-items:center;gap:7px;height:34px;padding:0 12px;background:transparent;border:1px solid transparent;border-radius:6px;color:inherit;cursor:pointer;font-size:12.5px;white-space:nowrap}
+#bar button:hover{background:rgba(127,127,127,.16)}
+#bar .apps{flex:1;display:flex;gap:4px;overflow-x:auto;min-width:0}
+#bar .apps button.on{background:rgba(127,127,127,.22);border-color:rgba(127,127,127,.3)}
+#bar .apps button.min{opacity:.6}
+#bar .clock{font-family:var(--f-mono);font-size:12px;text-align:right;line-height:1.3;padding:0 6px}
+#menu{position:absolute;left:8px;bottom:50px;z-index:7000;width:300px;background:var(--win);color:var(--fg);border:1px solid var(--line);border-radius:8px;box-shadow:0 18px 40px rgba(0,0,0,.45);padding:8px;display:flex;flex-direction:column;gap:2px}
+#menu[hidden]{display:none}
+#menu .h{font-size:11px;color:var(--muted);padding:4px 8px}
+#menu button{text-align:left;background:transparent;border:0;border-radius:5px;padding:7px 10px;color:var(--fg);cursor:pointer;font-size:13px}
+#menu button:hover:not(:disabled){background:var(--surface2)}
+#menu button:disabled{opacity:.4;cursor:not-allowed}
+#menu button.cur{font-weight:700}
+#menu hr{border:0;border-top:1px solid var(--line);margin:4px 0}
+.toast{position:absolute;right:14px;bottom:154px;z-index:5500;width:min(320px,calc(100% - 28px));display:flex;gap:10px;align-items:flex-start;background:var(--win);color:var(--fg);border:1px solid var(--line);border-radius:8px;box-shadow:0 12px 30px rgba(0,0,0,.4);padding:10px 12px;cursor:pointer;animation:tin .25s ease-out}
+.toast b{display:block;font-size:12.5px}
+.toast span{font-size:12.5px;color:var(--muted)}
+@keyframes tin{from{transform:translateY(8px);opacity:0}}
+
+/* ===== タイトル・章扉・エンディング ===== */
+.over{position:fixed;inset:0;z-index:9000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:#030305;color:#e9e7e0;text-align:center;padding:24px}
+.over[hidden]{display:none}
+#title .bgv{position:absolute;inset:0;opacity:.22;filter:blur(1px) saturate(.6)}
+#title .bgv svg{width:100%;height:100%;object-fit:cover}
+#title .in{position:relative;display:flex;flex-direction:column;align-items:center;gap:14px}
+#title h1{font-family:var(--f-display);font-weight:800;font-size:clamp(44px,9vw,96px);letter-spacing:.14em;margin:0;line-height:1.1}
+#title h1 span{color:#e5a13f}
+#title p{margin:0;color:#a9abb3;font-family:var(--f-display)}
+#title .go{margin-top:18px;background:transparent;color:#e9e7e0;border:1px solid #6b6e78;border-radius:3px;padding:10px 34px;font-size:15px;letter-spacing:.2em;cursor:pointer;font-family:var(--f-display)}
+#title .go:hover{border-color:#e5a13f;color:#e5a13f}
+#title .note{position:absolute;bottom:18px;left:0;right:0;font-size:11.5px;color:#6f727c;font-family:var(--f-ui)}
+#title::after,#card::after{content:"";position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(255,255,255,.03) 0 1px,transparent 1px 3px)}
+#card{cursor:pointer;transition:opacity .6s}
+#card.out{opacity:0;pointer-events:none}
+#card .boot{font-family:var(--f-mono);font-size:12.5px;color:#7f8596;text-align:left;white-space:pre;min-height:1em}
+#card .no{font-family:var(--f-mono);font-size:12px;letter-spacing:.3em;color:#e5a13f}
+#card h2{font-family:var(--f-display);font-size:clamp(30px,5vw,48px);margin:0;letter-spacing:.12em}
+#card .wh{font-family:var(--f-mono);font-size:13px;color:#9a9ca5}
+#endov{justify-content:flex-start;overflow:auto;background:#07080b}
+.ending{max-width:720px;width:100%;margin:6vh auto;padding:0 8px 48px;display:flex;flex-direction:column;gap:14px;text-align:left;font-family:var(--f-display);font-size:16px;line-height:1.95}
+.ending h2{font-size:34px;margin:0;letter-spacing:.1em}
+.ending p{margin:0}
+.ending .eyebrow{font-family:var(--f-mono);font-size:11px;letter-spacing:.2em;color:#7fb59a}
+.ending .epi{border-top:1px solid #2c2f37;padding-top:16px;color:#bfc2d4;display:flex;flex-direction:column;gap:10px}
+.ending .present{border-top:1px solid #2c2f37;padding-top:16px;display:flex;flex-direction:column;gap:10px}
+.ending .frame{border-left:2px solid #8fa4c9;padding-left:12px;color:#b9c3da}
+.ending .who2{display:block;font-family:var(--f-mono);font-size:11px;letter-spacing:.12em;color:#8fa4c9}
+.ending .teaser{border:1px solid #8fa4c9;padding:14px 16px;display:flex;flex-direction:column;gap:6px}
+.ending .teaser .t{font-size:22px;font-weight:800;letter-spacing:.1em}
+.ending .mono{font-family:var(--f-mono)}
+.ending .cap{font-size:12.5px;color:#7d808a;font-family:var(--f-ui)}
+.ending .back{align-self:flex-start;background:transparent;color:#e9e7e0;border:1px solid #6b6e78;padding:8px 22px;cursor:pointer;font-family:var(--f-display);letter-spacing:.1em}
+
+/* ===== アプリの中身 ===== */
+.cap{font-size:12.5px;color:var(--muted)}
+.mono{font-family:var(--f-mono)}
+.chat{display:flex;flex-direction:column;gap:10px;padding:14px}
+.bubble{background:var(--surface2);border:1px solid var(--line);padding:8px 12px;border-radius:4px 14px 14px 14px;max-width:86%;font-size:14px;line-height:1.65}
+.bubble .n{display:block;font-size:11px;color:var(--muted)}
+.bubble.me{align-self:flex-end;border-radius:14px 4px 14px 14px;background:color-mix(in srgb,var(--focus) 22%,var(--surface2))}
+.chathead{flex:none;display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line)}
+.chathead .av{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:var(--surface2);font-size:13px;font-weight:700}
+.doc{background:#eef0f4;color:#22252e;padding:14px 18px;border-radius:2px;font-size:14px;border:1px solid #d5d8de}
+.doc .meta{font-size:12px;color:#6a6f80;margin-bottom:4px}
+.doc h4{margin:0 0 6px;font-size:16px}
+.doc.draft{background:#e9e5d6;border-left:4px solid #b39a5a}
+.tablewrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13.5px;font-variant-numeric:tabular-nums}
+th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{color:var(--muted);font-weight:500;font-size:12px;letter-spacing:.05em}
+td.m{font-family:var(--f-mono)}
+tr.sel td{background:color-mix(in srgb,var(--accent) 22%,transparent)}
+tr.pick{cursor:pointer}
+tr.pick:hover td{background:var(--surface2)}
+.cmp{font-family:var(--f-mono);font-size:14px;background:var(--bg);border:1px solid var(--line);padding:10px 12px;display:flex;flex-direction:column;gap:4px;overflow-x:auto}
+.cmp .d{background:var(--red);color:#fff}
+.cmp .verdict{font-family:var(--f-ui);font-size:13px}
+.stream{position:relative;background:#000;overflow:hidden;max-width:100%}
+.stream svg{display:block;width:100%;height:auto}
+.stream .ov{position:absolute;inset:0;pointer-events:none;font-family:var(--f-dot);color:#e8e8e0;font-size:clamp(10px,2vw,14px);background:repeating-linear-gradient(0deg,rgba(255,255,255,.035) 0 1px,transparent 1px 3px)}
+.ov .tl{position:absolute;top:8px;left:10px}
+.ov .tr{position:absolute;top:8px;right:10px;text-align:right}
+.ov .live{color:#ff5e5e}
+.diffbox{position:relative;background:#000;max-width:100%}
+.diffbox svg{display:block;width:100%;height:auto}
+.diffbox .top{position:absolute;inset:0}
+.diffbox.diff .top{mix-blend-mode:difference}
+.seg{display:flex;flex-wrap:wrap;border:1px solid var(--line);align-self:flex-start;border-radius:5px;overflow:hidden}
+.seg button{font-size:13px;background:transparent;color:var(--muted);border:0;padding:6px 14px;cursor:pointer}
+.seg button.on{background:var(--accent);color:#1a1206}
+.site{background:#07080c;color:#cfc9b8}
+.site .body{padding:22px 18px;font-family:var(--f-display)}
+.site .body .t{font-size:24px;letter-spacing:.3em}
+.site .body p{font-size:14px;color:#8a8577;margin:8px 0 0}
+.term{background:#0b0c10;font-family:var(--f-mono);font-size:13px;color:#cdd3e0;display:flex;flex-direction:column;height:100%;--muted:#7f8596}
+.term .out{flex:1;min-height:120px;padding:12px 14px;overflow:auto;white-space:pre-wrap;word-break:break-all}
+.term .out .cmd{color:#e5a13f}
+.term .out .dim{color:var(--muted)}
+.term form{display:flex;border-top:1px solid #23262e}
+.term form span{padding:9px 0 9px 12px;color:#e5a13f}
+.term input{flex:1;min-width:0;background:transparent;border:0;color:#e4e4e7;font:inherit;padding:9px 10px;outline:none}
+.term .chips{display:flex;flex-wrap:wrap;gap:6px;padding:8px 12px;border-top:1px solid #23262e}
+.term .chips button{font-size:11.5px;background:#1b1d23;color:#9a9ca5;border:1px solid #2c2f37;padding:3px 8px;cursor:pointer;border-radius:3px}
+.slider{display:flex;align-items:center;gap:12px;font-size:13px;color:var(--muted)}
+.slider input{flex:1}
+.spec{display:flex;align-items:flex-end;gap:3px;height:110px;padding:8px 10px 0;background:#0b0c10;border:1px solid var(--line)}
+.spec i{flex:1;background:#3b4566;min-width:0}
+.spec i.pk{background:#e5a13f}
+.speclab{display:flex;justify-content:space-between;font-family:var(--f-mono);font-size:11px;color:var(--muted);padding:2px 10px 0}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+.card{background:var(--surface2);border:1px solid var(--line);padding:12px 14px;font-size:13.5px;border-radius:4px}
+.card b{display:block;font-size:15px}
+.card .r{color:var(--muted);font-size:12px}
+.news{background:#fff;color:#22252e;padding:16px 18px;font-size:14px}
+.news .src{font-size:11px;color:#6a6f80;letter-spacing:.06em}
+.news h4{font-family:var(--f-display);font-size:19px;margin:4px 0 8px;line-height:1.4}
+.scan{background:#e9e4d6;color:#2b2a26;padding:18px;display:flex;flex-direction:column;gap:10px;font-size:13.5px}
+.scan .pf{background:#0d0e12;color:#cfc9b8;padding:14px 16px;border:6px solid #f5f2ea;box-shadow:0 2px 6px rgba(0,0,0,.25);transform:rotate(-1deg)}
+.scan .hand{font-family:var(--f-display);color:#2d3a72;transform:rotate(-2deg)}
+/* 地図 */
+.mapapp{background:var(--map-land);display:flex;flex-direction:column;--fg:#d8dae6;--muted:#8b91aa;color:var(--fg)}
+.mapbar{display:flex;gap:8px;padding:8px;border-bottom:1px solid #2a3044;flex-wrap:wrap;background:#1b2032}
+.mapbar input{flex:1 1 160px;min-width:0;background:#0c0e16;color:var(--fg);border:1px solid #2a3044;padding:7px 12px;font:inherit;border-radius:18px}
+.mapbar label{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted)}
+.results{display:flex;flex-direction:column;border-bottom:1px solid #2a3044}
+.results:empty{display:none}
+.results button{text-align:left;background:transparent;color:var(--fg);border:0;border-bottom:1px solid #2a3044;padding:7px 12px;cursor:pointer;font-size:13px}
+.results button span{color:var(--muted);font-size:12px;margin-left:8px}
+.mapview svg{display:block;width:100%;height:auto}
+.pin{cursor:pointer}
+.pin text{font-family:var(--f-ui);font-size:12px;fill:var(--fg);paint-order:stroke;stroke:var(--map-land);stroke-width:4px;stroke-linejoin:round}
+.pin.dim{opacity:.3}
+.pin.on circle.p{stroke:#e5a13f;stroke-width:3}
+.placecard{padding:14px 16px;border-top:1px solid #2a3044;background:#141826;display:flex;flex-direction:column;gap:6px}
+.placecard .ttl{font-weight:700;font-size:16px}
+.placecard .kind{font-size:12px;color:var(--muted)}
+.placecard dl{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;margin:4px 0;font-size:13.5px}
+.placecard dt{color:var(--muted)}
+.placecard dd{margin:0}
+.review{font-size:13px;background:#0c0e16;padding:7px 10px;border:1px solid #2a3044}
+.review .st{color:#e5a13f;font-family:var(--f-mono);font-size:11px}
+/* 捜査ノート */
+.nt-head{display:flex;flex-direction:column;gap:2px;padding-bottom:10px;border-bottom:1px solid var(--line)}
+.nt-head b{font-family:var(--f-display);font-size:18px}
+.nt-head span{font-size:12px;color:var(--muted)}
+.bd h3{margin:4px 0 0;font-size:12px;letter-spacing:.12em;color:var(--muted);font-weight:500}
+.steps{display:flex;flex-direction:column;gap:12px}
+.task{padding:14px 16px;border:1px solid var(--accent-dim);background:var(--task-bg);border-radius:4px}
+.task .num,.done-step .num{font-family:var(--f-mono);font-size:11px;letter-spacing:.12em;color:var(--accent)}
+.done-step .num{color:var(--ok)}
+.task .q{font-weight:700;margin:2px 0 10px}
+.ans{display:flex;gap:8px;flex-wrap:wrap}
+.ans input[type=text],.ans select{flex:1 1 160px;min-width:0;background:var(--bg);color:var(--fg);border:1px solid var(--line);padding:8px 10px;font:inherit;border-radius:4px}
+.opts{display:flex;flex-direction:column;gap:6px;margin-bottom:10px}
+.opts label{display:flex;gap:10px;align-items:flex-start;padding:7px 10px;background:var(--bg);border:1px solid var(--line);border-radius:4px;cursor:pointer;font-size:13.5px}
+.opts input{margin-top:5px;accent-color:var(--accent)}
+.btn{font-weight:700;background:var(--accent);color:#1a1206;border:0;padding:8px 16px;cursor:pointer;border-radius:4px}
+.btn.ghost{background:transparent;color:var(--muted);border:1px solid var(--line);font-weight:500}
+.btn.sm{font-size:12.5px;padding:4px 12px}
+.feedback{margin-top:8px;font-size:13.5px}
+.feedback:empty{display:none}
+.feedback.bad{color:var(--red)}
+.done-step{padding:10px 14px;border-left:3px solid var(--ok);background:var(--ok-bg);font-size:13.5px}
+.done-step b{color:var(--ok)}
+.hints{display:flex;flex-direction:column;gap:6px}
+.hint{font-size:13px;color:var(--muted);background:var(--bg);padding:8px 10px;border:1px dashed var(--line)}
+.solved{padding:14px 16px;border-left:3px solid var(--ok);background:var(--ok-bg);display:flex;flex-direction:column;gap:8px}
+.solved p{margin:0}
+.solved .btn{align-self:flex-start;margin-top:4px}
+.memo-list{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px;font-size:13.5px}
+.confirm{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:6px 10px;font-size:13px}
+@media (prefers-reduced-motion:no-preference){
+  .flick{animation:flick 6s infinite}
+  @keyframes flick{0%,96%,100%{opacity:1}97%{opacity:.75}98%{opacity:1}99%{opacity:.85}}
+}
+@media (prefers-reduced-motion:reduce){#narr .more,.toast{animation:none}}
+/* 狭い画面: ウィンドウは一枚ずつ全面に開く */
+@media (max-width:760px){
+  #icons{left:0;right:0;top:0;bottom:auto;height:82px;padding:6px 8px;flex-wrap:nowrap;flex-direction:row;overflow-x:auto;gap:2px}
+  #icons button{flex:none;width:72px;padding:4px 2px}
+  #icons .tile{width:38px;height:38px;font-size:20px}
+  .win{left:0!important;top:82px!important;width:100%!important;height:calc(100% - 82px)!important;border-radius:0;border-width:1px 0 0;resize:none}
+  #desk.nr-on .win{height:calc(100% - 82px - 162px)!important}
+  .win .tb{cursor:default}
+  .toast{top:90px;bottom:auto}
+  #narr{bottom:8px;width:calc(100% - 16px);padding:10px 12px 8px}
+  #narr .txt{font-size:15px;min-height:3.4em}
+  #bar #menuBtn{font-size:0;gap:0}
+  #bar #menuBtn .ic{font-size:18px}
+  #bar .clock{font-size:11px}
+}
+</style>
+
+<div id="screen" class="y2026">
+  <div id="desk">
+    <nav id="icons" aria-label="アプリ"></nav>
+    <div id="wins"></div>
+    <div id="narr" role="region" aria-label="語り" aria-live="polite"></div>
+  </div>
+  <div id="bar">
+    <button type="button" id="menuBtn" aria-haspopup="true" aria-expanded="false"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h7l2 2h9v10H3z"/></svg>事件ファイル</button>
+    <div class="apps" id="tasks"></div>
+    <button type="button" id="narrBtn" hidden>語りを表示</button>
+    <div class="clock" id="clock"></div>
+  </div>
+  <div id="menu" hidden></div>
+</div>
+<div id="title" class="over">
+  <div class="bgv" aria-hidden="true"></div>
+  <div class="in">
+    <h1>無人<span>放送</span></h1>
+    <p>毎夜三時三十三分。誰もいない部屋が、十一分だけ映る。</p>
+    <button type="button" class="go" id="start">はじめる</button>
+  </div>
+  <div class="note">進行状況はこのブラウザに保存されます。登場する人物・地名・サイトはすべて架空です。</div>
+</div>
+<div id="card" class="over out" aria-hidden="true"></div>
+<div id="endov" class="over" hidden></div>
+
+<script>
+// ===== 部屋の絵 =====
+let svgN=0;
+function roomSVG(o={}){
+  const id='vg'+(svgN++);
+  const k=o.dark?0.38:1;
+  const c=(r,g,b)=>`rgb(${Math.round(r*k)},${Math.round(g*k)},${Math.round(b*k)})`;
+  const fig=o.figures?`
+    <path d="M392 330 L398 190 Q400 160 418 152 Q412 132 424 120 Q440 110 452 124 Q460 140 450 154 Q470 162 472 192 L478 330 Z" fill="rgb(16,17,23)"/>
+    <path d="M470 196 L488 250 L480 254 L464 210 Z" fill="rgb(17,18,24)"/>
+    <rect x="478" y="240" width="9" height="6" fill="rgb(31,29,21)"/>
+    <path d="M250 330 L256 205 Q258 178 274 172 Q268 152 280 142 Q294 134 304 146 Q310 160 302 172 Q320 180 322 206 L328 330 Z" fill="rgb(15,16,22)"/>
+    <rect x="318" y="212" width="11" height="8" fill="rgb(28,33,42)"/>`:'';
+  const gap=o.seam?14:3;
+  const seam=`<rect x="${152-gap/2}" y="128" width="${gap}" height="150" fill="${c(8,8,10)}"/>`+(o.seam?`<path d="M149 214 q3 -6 6 0 q-1 8 -6 10z" fill="${c(120,116,104)}"/>`:'');
+  const fl=o.noflick?'':'flick';
+  return `<svg viewBox="0 0 640 360" role="img" aria-label="うつろ放送の配信画面。薄暗い和室">
+  <defs><radialGradient id="${id}" cx="50%" cy="50%" r="70%"><stop offset="60%" stop-color="#000" stop-opacity="0"/><stop offset="100%" stop-color="#000" stop-opacity=".7"/></radialGradient></defs>
+  <rect width="640" height="360" fill="${c(28,30,40)}"/>
+  <polygon points="0,290 640,290 640,360 0,360" fill="${c(44,46,34)}"/>
+  ${[0,1,2,3,4].map(i=>`<line x1="${i*160}" y1="290" x2="${i*160-40}" y2="360" stroke="${c(30,32,24)}" stroke-width="2"/>`).join('')}
+  <line x1="0" y1="290" x2="640" y2="290" stroke="${c(20,20,24)}" stroke-width="3"/>
+  <rect x="80" y="118" width="144" height="172" fill="${c(56,52,44)}"/>
+  <rect x="92" y="128" width="60" height="150" fill="${c(170,164,146)}"/>
+  <rect x="152" y="128" width="62" height="150" fill="${c(166,160,142)}"/>
+  ${seam}
+  <circle cx="142" cy="206" r="3" fill="${c(70,64,52)}"/><circle cx="162" cy="206" r="3" fill="${c(70,64,52)}"/>
+  <g transform="translate(300 86)">
+    <circle r="26" fill="${c(200,196,184)}" stroke="${c(60,58,52)}" stroke-width="3"/>
+    <g transform="scale(-1 1)" font-family="IBM Plex Mono, monospace" font-size="10" fill="${c(40,40,40)}" text-anchor="middle">
+      <text y="-14">12</text><text x="17" y="4">3</text><text y="22">6</text><text x="-17" y="4">9</text>
+    </g>
+    <line x1="0" y1="0" x2="8" y2="14" stroke="${c(30,30,30)}" stroke-width="2"/>
+    <line x1="0" y1="0" x2="-10" y2="3" stroke="${c(30,30,30)}" stroke-width="2.5"/>
+  </g>
+  <rect x="408" y="70" width="190" height="150" fill="${c(10,12,22)}" stroke="${c(70,66,58)}" stroke-width="6"/>
+  <line x1="503" y1="70" x2="503" y2="220" stroke="${c(70,66,58)}" stroke-width="4"/>
+  <g>
+    <rect x="433" y="128" width="3" height="66" fill="${c(90,90,96)}"/>
+    <line x1="424" y1="122" x2="446" y2="140" stroke="${c(210,200,60)}" stroke-width="4"/>
+    <line x1="446" y1="122" x2="424" y2="140" stroke="${c(210,200,60)}" stroke-width="4"/>
+    <circle cx="427" cy="152" r="5" fill="${c(120,30,30)}"/><circle cx="443" cy="152" r="5" fill="${c(120,30,30)}"/>
+  </g>
+  <rect x="464" y="152" width="122" height="32" fill="${c(46,40,24)}"/>
+  <g transform="translate(525 174) scale(-1 1)"><text text-anchor="middle" font-family="Zen Kaku Gothic New, sans-serif" font-weight="700" font-size="16" fill="${o.dark?'rgb(110,86,40)':'#f0c060'}" class="${fl}">ツキミ ランドリー</text></g>
+  <rect x="412" y="196" width="182" height="3" fill="${c(60,60,70)}"/>
+  <ellipse cx="330" cy="318" rx="60" ry="14" fill="${c(80,40,40)}"/>
+  ${fig}
+  <rect width="640" height="360" fill="url(#${id})"/>
+</svg>`;
+}
+function stream(svg,tl,tr){return `<div class="stream">${svg}<div class="ov"><div class="tl"><span class="live">●</span> ${tl}</div><div class="tr">${tr}</div></div></div>`}
+
+// ===== 地図 =====
+const PLACES=[
+ {id:'L',name:'ツキミ ランドリー',kind:'コインランドリー',x:330,y:292,addr:'月見台二丁目 4-1',info:[['営業','24時間'],['建物','平屋'],['看板','通りに面した北側の壁']],rev:[[4,'深夜でも看板が明るくて、帰り道の目印になる。'],[3,'乾燥機が古い。']]},
+ {id:'A',name:'コーポ月見台',kind:'アパート',x:330,y:200,addr:'月見台二丁目 3-8',info:[['階数','3階建て'],['窓','全室 南向き（通り側）'],['管理','久我ハウジング管理']],rev:[[3,'駅からは遠いけど静か。夜中の貨物列車は少しうるさい。'],[2,'3階の東の角部屋、何年も空いてるのに、夜中にカーテンの隙間が光ってることがある。']]},
+ {id:'B',name:'ハイツ白鷺',kind:'アパート',x:330,y:372,addr:'月見台二丁目 5-2',info:[['階数','3階建て'],['窓','北向き（正面はランドリーの裏壁）'],['管理','白鷺不動産']],rev:[[4,'ランドリーの裏なので静か。眺めは壁だけ。']]},
+ {id:'C',name:'メゾン月見台',kind:'アパート',x:480,y:330,addr:'月見台二丁目 6-11',info:[['階数','3階建て'],['窓','北向き（通り側）'],['管理','月見台ハウス']],rev:[[4,'築浅できれい。駅まで徒歩10分。']]},
+ {id:'X',name:'月見台第一踏切',kind:'踏切',x:170,y:255,addr:'東湾線 月見台駅〜湾岸台駅',info:[['路線','東湾線・東湾貨物線']],rev:[[3,'開かずの踏切ってほどではない。深夜も貨物が通る。']]},
+ {id:'S',name:'月見台駅',kind:'駅',x:170,y:430,addr:'東湾線',info:[['路線','東湾線（旅客）、東湾貨物線が並走']],rev:[]},
+ {id:'K',name:'久我ハウジング管理 月見台店',kind:'不動産会社',x:520,y:200,addr:'月見台二丁目 2-5',info:[['営業','10:00〜19:00'],['定休','水曜']],rev:[[5,'担当の久我さんがとても親切。時計の話をしたら止まらなかった。']]},
+ {id:'M',name:'ヨルマート 月見台店',kind:'コンビニ',x:250,y:200,addr:'月見台二丁目 3-1',info:[['営業','24時間']],rev:[[3,'深夜の店員さんがいつも眠そう。']]},
+ {id:'D',name:'コインランドリー月見',kind:'コインランドリー',x:600,y:92,addr:'月見台五丁目 1-3',info:[['営業','6:00〜24:00'],['看板','「コインランドリー月見」']],rev:[[3,'北総線の高架の下。電車が通ると揺れる。']]},
+ {id:'H',name:'ハイツ北総',kind:'アパート',x:640,y:40,addr:'月見台五丁目 1-9',info:[['階数','4階建て'],['窓','南向き'],['管理','北総エステート']],rev:[[2,'高架の真横。夜中の貨物で目が覚める。']]},
+ {id:'P',name:'月見台公園',kind:'公園',x:470,y:420,addr:'月見台三丁目',info:[],rev:[[4,'夜は暗いので注意。']]},
+];
+const kata=s=>norm(s).replace(/[ぁ-ゖ]/g,ch=>String.fromCharCode(ch.charCodeAt(0)+0x60));
+function mapSVG(sel,q,rails){
+  const qq=kata(q||'');
+  const match=p=>!qq||kata(p.name+p.kind+p.addr).includes(qq);
+  const pins=PLACES.map(p=>{
+    const on=p.id===sel, dim=qq&&!match(p);
+    const icon=p.kind==='踏切'?`<g transform="translate(${p.x} ${p.y})"><line x1="-7" y1="-7" x2="7" y2="7" stroke="#e8d24a" stroke-width="3"/><line x1="7" y1="-7" x2="-7" y2="7" stroke="#e8d24a" stroke-width="3"/></g><circle class="p" cx="${p.x}" cy="${p.y}" r="11" fill="transparent"/>`
+      :`<circle class="p" cx="${p.x}" cy="${p.y}" r="8" fill="${p.kind==='アパート'?'#6f8fd6':p.kind==='コインランドリー'?'#e5a13f':p.kind==='駅'?'#d8dae6':'#8b91aa'}" stroke="#0c0e16" stroke-width="2"/>`;
+    const lx=p.x>560?-12:12, anc=p.x>560?'end':'start';
+    return `<g class="pin ${on?'on':''} ${dim?'dim':''}" data-p="${p.id}" tabindex="0" role="button" aria-label="${p.name}">${icon}<text x="${p.x+lx}" y="${p.y+4}" text-anchor="${anc}">${p.name}</text></g>`;}).join('');
+  return `<svg viewBox="0 0 700 480" role="img" aria-label="月見台周辺の地図">
+   <rect width="700" height="480" fill="var(--map-land)"/>
+   ${[[20,20,130,215],[190,20,210,215],[410,20,110,215],[200,272,260,150],[490,272,190,110],[20,272,130,190],[420,400,120,70]].map(r=>`<rect x="${r[0]}" y="${r[1]}" width="${r[2]}" height="${r[3]}" rx="4" fill="var(--map-block)"/>`).join('')}
+   <rect x="0" y="246" width="700" height="18" fill="var(--map-road)"/>
+   <rect x="466" y="0" width="12" height="480" fill="var(--map-road)"/>
+   <text x="600" y="243" font-size="11" fill="var(--muted)">月見台通り</text>
+   ${rails?`
+   <line x1="170" y1="0" x2="170" y2="480" stroke="var(--map-rail)" stroke-width="5"/>
+   <line x1="170" y1="0" x2="170" y2="480" stroke="var(--map-land)" stroke-width="2" stroke-dasharray="10 8"/>
+   <text x="178" y="60" font-size="11" fill="var(--map-rail)">東湾線 / 東湾貨物線</text>
+   <line x1="520" y1="0" x2="700" y2="150" stroke="var(--map-rail)" stroke-width="5"/>
+   <line x1="520" y1="0" x2="700" y2="150" stroke="var(--map-land)" stroke-width="2" stroke-dasharray="10 8"/>
+   <text x="560" y="150" font-size="11" fill="var(--map-rail)">北総貨物線（高架）</text>`:''}
+   <g transform="translate(40 440)"><path d="M0 -18 L7 0 L0 -5 L-7 0 Z" fill="var(--fg)"/><text y="14" text-anchor="middle" font-size="12" fill="var(--fg)" font-family="IBM Plex Mono">N</text></g>
+   <g transform="translate(560 465)"><line x1="0" y1="0" x2="80" y2="0" stroke="var(--muted)" stroke-width="2"/><text x="40" y="-5" text-anchor="middle" font-size="10" fill="var(--muted)" font-family="IBM Plex Mono">100 m</text></g>
+   ${pins}
+  </svg>`;
+}
+function placeCard(id){
+  const p=PLACES.find(x=>x.id===id);
+  if(!p)return `<div class="placecard"><div class="cap">地図上のピンか検索結果をタップすると、場所の詳細が表示されます。</div></div>`;
+  return `<div class="placecard"><div class="ttl">${p.name}</div><div class="kind">${p.kind} ・ ${p.addr}</div>
+   ${p.info.length?`<dl>${p.info.map(i=>`<dt>${i[0]}</dt><dd>${i[1]}</dd>`).join('')}</dl>`:''}
+   ${p.rev.map(r=>`<div class="review"><span class="st">${'★'.repeat(r[0])}${'☆'.repeat(5-r[0])}</span> ${r[1]}</div>`).join('')}</div>`;
+}
+let MAP={sel:null,q:'',rails:true};
+function initMap(){
+  const host=document.getElementById('mapapp');
+  const draw=()=>{
+    document.getElementById('mapview').innerHTML=mapSVG(MAP.sel,MAP.q,MAP.rails);
+    document.getElementById('pcard').innerHTML=placeCard(MAP.sel);
+    const res=MAP.q?PLACES.filter(p=>kata(p.name+p.kind+p.addr).includes(kata(MAP.q))):[];
+    const R=document.getElementById('mres');
+    R.innerHTML=MAP.q?(res.length?res.map(p=>`<button type="button" data-p="${p.id}">${p.name}<span>${p.kind}</span></button>`).join(''):`<button type="button" disabled>「${esc(MAP.q)}」に一致する場所はありません<span></span></button>`):'';
+    host.querySelectorAll('[data-p]').forEach(el=>{const go=()=>{MAP.sel=el.dataset.p;draw()};el.onclick=go;el.onkeydown=e=>{if(e.key==='Enter')go()}});
+  };
+  const inp=document.getElementById('mq'); inp.value=MAP.q;
+  inp.oninput=()=>{MAP.q=inp.value.trim();draw()};
+  const rl=document.getElementById('mrail'); rl.checked=MAP.rails; rl.onchange=()=>{MAP.rails=rl.checked;draw()};
+  draw();
+}
+
+// ===== ハッシュ比較 =====
+const HASH=[['10/05','月','3f9a1c07e2c1d8a0',''],['10/06','火','b72e5590d104e7c3',''],['10/07','水','e01d8a42719f05b6',''],['10/08','木','5c44f03b6ea7192d',''],['10/09','金','4a17c9e05b38f2d6',''],['10/10','土','0d6c4be1f9e2a375',''],['10/11','日','a8b03e6f217dc94e','人影？'],['10/12','月','b72e5590d104e7c3',''],['10/13','火','e01d8a42719f05b6',''],['10/14','水','5c44f03b6ea7192d',''],['10/15','木','b72e5590d104e7c3',''],['10/16','金','e01d8a42719f05b6',''],['10/17','土','5c44f03b6ea7192d',''],['10/18','日','b72e5590d104e7c3','日曜なのに貨物の音']];
+const dateRe=d=>{const [m,dd]=d.split('/');return new RegExp(`^(${m}/${dd}|${m}${dd}|${m}-${dd}|${m}月${dd}日?|${+dd}日?)$`)};
+let hsel=[];
+function initHash(){
+  const rows=document.querySelectorAll('#htab tr.pick'),out=document.getElementById('hcmp');
+  const draw=()=>{
+    rows.forEach(r=>r.classList.toggle('sel',hsel.includes(+r.dataset.h)));
+    if(hsel.length<2){out.innerHTML=`<span class="verdict">${hsel.length?HASH[hsel[0]][0]+' を選択中。もう1行選んでください。':'比較する2行を選んでください。'}</span>`;return}
+    const [a,b]=hsel.map(i=>HASH[i]);let diff=0;
+    const line=(x,y)=>[...x[2]].map((ch,k)=>ch===y[2][k]?ch:`<span class="d">${ch}</span>`).join('');
+    [...a[2]].forEach((ch,k)=>{if(ch!==b[2][k])diff++});
+    out.innerHTML=`<div>${a[0]}  ${line(a,b)}</div><div>${b[0]}  ${line(b,a)}</div><span class="verdict" style="color:${diff?'var(--muted)':'var(--accent)'}">${diff?`${diff}文字違う。別のデータ。`:'完全に一致。同じデータ。'}</span>`;
+  };
+  rows.forEach(r=>{const go=()=>{const i=+r.dataset.h;if(hsel.includes(i))hsel=hsel.filter(x=>x!==i);else{hsel.push(i);if(hsel.length>2)hsel.shift()}draw()};r.onclick=go;r.onkeydown=e=>{if(e.key==='Enter')go()}});
+  draw();
+}
+// ===== 差分 =====
+function initDiff(){
+  const box=document.getElementById('dbox'),top=document.getElementById('dtop'),cap=document.getElementById('dcap');
+  const caps={a:'ループ素材（10/06 の映像）の、同じ 03:43:59 のフレーム。',b:'10/12 の配信で、ループの継ぎ目に1フレームだけ混ざった映像。',d:'差分：2枚の画像を重ね、同じところは黒く、違うところだけが光る。'};
+  document.querySelectorAll('.seg button').forEach(b=>b.onclick=()=>{
+    document.querySelectorAll('.seg button').forEach(x=>x.classList.toggle('on',x===b));
+    const v=b.dataset.v; top.hidden=v==='a'; box.classList.toggle('diff',v==='d'); cap.textContent=caps[v];});
+}
+// ===== 明るさ補正 =====
+function initBright(){
+  const br=document.getElementById('br');
+  const f=()=>{const v=+br.value;document.querySelector('#enh svg').style.filter=`brightness(${v}) contrast(${1+(v-1)*.3}) saturate(${1-(v-1)*.1})`;document.getElementById('brv').textContent='×'+v.toFixed(1)};
+  br.oninput=f;f();
+}
+
+// ===== 端末 =====
+const TERM={
+ help:()=>`使えるコマンド:
+  history                  遼のPCに残っていたコマンド履歴
+  view-source &lt;ドメイン>   ページのソースを表示
+  whois &lt;ドメイン>         ドメインの登録情報
+  wayback &lt;ドメイン> [日付] 保存された過去の版
+  analytics &lt;ID>           同じ解析IDを使うサイトを逆引き
+  curl &lt;URL>               ページの本文を取得
+  clear                    画面を消す`,
+ history:()=>`  1  whois utsuro.tv
+  2  view-source utsuro.tv
+  3  wayback utsuro.tv
+  4  wayback utsuro.tv 2021
+<span class="dim"># 履歴はここで途切れている。最後のコマンドは日付が途中までしか打たれていない。</span>`,
+ 'view-source utsuro.tv':()=>`&lt;!doctype html>
+&lt;html lang="ja">
+&lt;head>
+  &lt;meta charset="utf-8">
+  &lt;title>うつろ放送&lt;/title>
+  &lt;!-- analytics: UA-48213077-2 -->
+&lt;/head>
+&lt;body>
+  &lt;!-- 初期のカメラ画面がアーカイブに残ってる。消すこと -->
+  &lt;div id="room">&lt;/div>
+  ...`,
+ 'curl utsuro.tv':()=>`うつろ放送
+毎夜、三時三十三分。うつろの部屋をお見せします。
+<span class="dim"># 本文には手がかりがない。ソースを見よう。</span>`,
+ 'whois utsuro.tv':()=>`Domain Name: UTSURO.TV
+Registrant: REDACTED FOR PRIVACY（登録代行サービス）
+Created:  2021-03-17
+Updated:  2026-10-12
+Expires:  2027-03-17
+<span class="dim"># 持ち主は隠されている。更新日は 10/12。</span>`,
+ 'wayback utsuro.tv':()=>`utsuro.tv の保存版:
+  20210320   ← 最古
+  20220811
+  20240102
+  20261001
+<span class="dim">日付を付けて開く: wayback utsuro.tv 20210320</span>`,
+ 'wayback utsuro.tv 20210320':()=>`[ 2021-03-20 時点の保存版 ]
+ページタイトル: IPCAM Live View
+
+  ネットワークカメラ ライブビュー
+  Model    : NC-210W
+  Name     : cam01
+  Wi-Fi    : KH-CORPO-3F-E (2.4GHz)
+  Status   : streaming
+<span class="dim"># カメラの初期設定画面がそのまま公開されていた。</span>`,
+ 'wayback utsuro.tv 20220811':()=>`[ 2022-08-11 ] 「うつろ放送」へ改装済み。カメラの情報は消えている。`,
+ 'wayback utsuro.tv 20240102':()=>`[ 2024-01-02 ] 会員限定アーカイブ（月額980円）が追加された。`,
+ 'wayback utsuro.tv 20261001':()=>`[ 2026-10-01 ] 現在とほぼ同じ。`,
+ 'analytics ua-48213077-2':()=>A(),'analytics ua-48213077':()=>A(),'analytics ua-48213077-1':()=>A(),
+ 'whois kuga-housing.jp':()=>`Domain Name: KUGA-HOUSING.JP
+Registrant: 久我ハウジング管理株式会社
+Admin Contact: 久我 圭吾
+Created: 2014-06-02`,
+ 'view-source kuga-housing.jp':()=>`&lt;title>久我ハウジング管理&lt;/title>
+&lt;!-- analytics: UA-48213077-1 -->`,
+ 'curl kuga-housing.jp':()=>`久我ハウジング管理株式会社
+月見台エリアの賃貸管理はおまかせください。
+
+管理物件:
+  コーポ月見台   → /properties/corpo-tsukimi
+  ハイツ月見坂   → /properties/heights-tsukimizaka
+スタッフ紹介:
+  久我 圭吾  趣味は古い機械式時計の収集`,
+ 'curl kuga-housing.jp/properties/corpo-tsukimi':()=>`コーポ月見台（月見台二丁目 3-8）
+3階建て ・ 全室南向き ・ 各階3戸
+建物内Wi-Fi: KH-CORPO-[階]F-[位置]
+
+3階 間取り（南の通りから見て）
+  ┌──────┬──────┬──────┐
+  │ 301  │ 303  │ 302  │
+  │  西  │ 中央 │  東  │
+  └──────┴──────┴──────┘
+※ 302号室は 2021年3月より募集停止`,
+ 'curl kuga-housing.jp/properties/heights-tsukimizaka':()=>`ハイツ月見坂（月見台七丁目）
+2階建て ・ 満室`,
+};
+function A(){return `UA-48213077 を使うサイト:
+  UA-48213077-1  kuga-housing.jp   「久我ハウジング管理」
+  UA-48213077-2  utsuro.tv         「うつろ放送」
+<span class="dim"># 同じ解析アカウントで管理されている。持ち主は同じ。</span>`}
+let termLog=null;
+function initTerm(){
+  const out=document.getElementById('tout'),f=document.getElementById('tform'),inp=document.getElementById('tin'),chips=document.getElementById('tchips');
+  if(termLog===null)termLog=`<span class="dim">ghostwire OSINT shell ・ help でコマンド一覧</span>\n`;
+  out.innerHTML=termLog;out.scrollTop=out.scrollHeight;
+  chips.innerHTML=['help','history','view-source ','whois ','wayback ','analytics ','curl '].map(s=>`<button type="button">${s}</button>`).join('');
+  chips.querySelectorAll('button').forEach(b=>b.onclick=()=>{inp.value=b.textContent;inp.focus()});
+  f.onsubmit=e=>{e.preventDefault();const raw=inp.value.trim();if(!raw)return;
+    const k=raw.normalize('NFKC').replace(/\s+/g,' ').toLowerCase().replace(/https?:\/\//g,'').replace(/^(\S+ \S+?)\/$/,'$1').replace(/www\./,'');
+    if(k==='clear'){termLog='';out.innerHTML='';inp.value='';return}
+    let res;
+    if(Object.hasOwn(TERM,k))res=TERM[k]();
+    else if(/^wayback utsuro\.tv 2021\d*$/.test(k)&&k!=='wayback utsuro.tv 20210320')res='日付は8桁で指定してください。一覧は wayback utsuro.tv で確認できます。';
+    else if(/^wayback utsuro\.tv \S+/.test(k))res='その日付の保存版はありません。wayback utsuro.tv で一覧を確認してください。';
+    else if(/^wayback kuga-housing\.jp/.test(k))res='保存版は現在のサイトと同じ内容です。';
+    else if(/^analytics/.test(k))res='一致するサイトは見つかりませんでした。IDはページのソースにあります。';
+    else if(/^curl kuga-housing\.jp\//.test(k))res='404 Not Found。トップページにリンクがあります。';
+    else if(/^(whois|curl|view-source|wayback)$/.test(k))res='引数が必要です。例: '+k+' utsuro.tv';
+    else if(/^(whois|curl|view-source|wayback) /.test(k))res='応答がありません。ドメイン名を確認してください。';
+    else res=`command not found: ${esc(raw.split(' ')[0])}`;
+    termLog+=`<span class="cmd">$ ${esc(raw)}</span>\n${res}\n\n`;
+    out.innerHTML=termLog;out.scrollTop=out.scrollHeight;inp.value='';};
+}
+
+// ===== アプリの部品 =====
+const ICON={
+ chat:'<path d="M4 5h16v11H10l-5 4v-4H4z"/>',
+ web:'<circle cx="12" cy="12" r="8"/><path d="M4 12h16M12 4c3.5 3.5 3.5 12.5 0 16M12 4c-3.5 3.5-3.5 12.5 0 16"/>',
+ map:'<path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2z"/><path d="M9 4v14M15 6v14"/>',
+ term:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 10l3 2-3 2M12 15h5"/>',
+ rec:'<rect x="3" y="6" width="13" height="12" rx="2"/><path d="M16 10l5-3v10l-5-3z"/>',
+ wave:'<path d="M3 12h2l2-6 3 12 3-9 2 6 2-3h4"/>',
+ sheet:'<rect x="4" y="4" width="16" height="16" rx="1"/><path d="M4 9h16M4 14h16M10 4v16"/>',
+ note:'<path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 12h7M9 16h7"/>',
+ doc:'<path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 11h7M9 14h7M9 17h4"/>',
+ pin:'<path d="M12 21s-6-6-6-11a6 6 0 0 1 12 0c0 5-6 11-6 11z"/><circle cx="12" cy="10" r="2"/>',
+ diff:'<rect x="3" y="5" width="11" height="11"/><rect x="10" y="8" width="11" height="11"/>',
+ people:'<circle cx="9" cy="9" r="3"/><path d="M3 19c0-3 3-5 6-5s6 2 6 5"/><circle cx="17" cy="8" r="2.5"/><path d="M15.5 13.5c3 0 5.5 1.7 5.5 4.5"/>',
+ lock:'<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
+ news:'<rect x="3" y="5" width="18" height="14" rx="1"/><path d="M7 9h10M7 12h10M7 15h6"/>',
+ image:'<rect x="3" y="5" width="18" height="14" rx="1"/><circle cx="9" cy="10" r="1.5"/><path d="M3 17l5-5 4 4 3-3 6 6"/>',
+};
+const icon=n=>`<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${ICON[n]}</svg>`;
+const browser=(url,inner)=>`<div class="addr">${icon('web')}<span>${url}</span></div><div class="page">${inner}</div>`;
+const M='ミオ';
+
+// ===== 章データ =====
+// narr: 語り [話し手, 本文, 'frame'＝2036年のミオ]。chat: チャットアプリの会話。apps: デスクトップのアプリ。open: 章の始めに開くアプリ
+const CH=[
+{
+ id:0,no:'序章',title:'十年後の依頼',theme:'y2036',mark:'SHINOMIYA RESEARCH',clock:'2036/10/20 23:10',where:'篠宮リサーチ 事務所',
+ narr:[[M,'2036年10月。篠宮透が逮捕されて、三日が経った。'],
+  [M,'容疑は殺人。被害者はフリーの記者で、透さんの古い知り合いだった。犯行時刻、透さんのスマホは現場にあった。現場の防犯カメラには、透さんによく似た男が映っていた。透さんのアカウントからは、「全部俺がやった」という投稿まで出ている。'],
+  [M,'透さんは取り調べで、ひとことも話していないらしい。'],
+  [M,'私は春日ミオ。透さんの事務所で働いて四年になる。'],
+  [M,'四年前、私は透さんに見つけられた側の人間だった。ログの消し方なら、その前から知っていた。残し方と読み方を教えてくれたのは、透さんだ。'],
+  [M,'逮捕の前の晩、透さんからメッセージが届いていた。'],
+  [M,'「ログは嘘をつかない。嘘をつくのは、ログを読む人間だ」。透さんの口癖だ。今回のログは、全部透さんが犯人だと言っている。']],
+ chat:{with:'篠宮 透',msgs:[['篠宮 透','2036/10/16 23:48','ミオ。しばらく事務所に戻れない。<br>最初の事件のファイルを読め。全部そこにある。<br>鍵は、俺が最初に名乗った名前。'],['篠宮 透','23:49','架純には連絡するな。'],['me','23:51','どういうことですか？ 透さん？']],tail:'既読はついていない。'},
+ open:['chat'],
+ steps:[
+  {type:'text',q:'暗号化された事件ファイルのパスワードは？',
+   check:v=>v==='ghostwire',
+   traps:[[/^(shinomiya|toru|篠宮|透)/,'本名ではない。透さんがネットで名乗っていた名前だ。'],[/ghost/,'つづりを確かめよう。']],
+   memo:'2036年。透さんが逮捕された。残されたのは、2026年の最初の事件のファイル。'}
+ ],
+ hints:['透さんのメッセージには「最初に名乗った名前」とある。','「資料」に、透さんが学生時代に使っていたプロフィールがある。'],
+ solved:`<p>ファイルが開いた。中身は、透さんが大学三年のときに使っていたノートPCのディスクイメージ。捜査メモと、集めたログのすべて。</p>
+ <p>透さんはよく、この事件のことを話してくれた。酔ったときだけ、少しずつ。これが、透さんが「こっち側」に来た最初の事件だった。</p>
+ <p>ここからは、透さんから聞いた話と、このファイルをもとに書く。</p>`,
+ apps:[
+  {id:'news',name:'ニュース',icon:'news',title:'東都ニュース',w:480,h:330,flush:true,html:browser('news.touto.example/2036/10/17',`<div class="news"><div class="src">東都ニュース ・ 2036/10/17</div><h4>記者殺害の疑い、調査会社代表の男を逮捕</h4>
+    警視庁は17日、記者の男性を殺害した疑いで、情報調査会社「篠宮リサーチ」代表、篠宮透容疑者（30）を逮捕した。位置情報や防犯カメラの映像などから関与が浮上したという。捜査はサイバー犯罪対策課の水野警部補らが担当している。篠宮容疑者は黙秘している。</div>
+    <div class="cap">担当の「水野警部補」。メッセージにあった「架純」と同じ名字だ。</div>`)},
+  {id:'scrap',name:'資料',icon:'image',title:'scan_0412.jpg ― 学生時代のスクラップ',w:440,h:380,flush:true,html:`<div class="scan">
+    <div class="cap" style="color:#6b675c">事務所の棚にあった、透さんの学生時代の古いスクラップ</div>
+    <div class="pf"><div style="font-size:11px;color:#8a8577">廃墟アーカイブ掲示板 ・ ユーザープロフィール（2025年 保存）</div>
+     <div style="font-family:var(--f-mono);font-size:18px;margin-top:6px">ghostwire</div>
+     <div style="font-size:13px;color:#8a8577">情報系の学生。消えたサイトの魚拓を集めています。幽霊は信じていません。</div>
+     <div style="font-size:11px;color:#8a8577;margin-top:4px">投稿数 1,284 ・ 登録 2023年</div></div>
+    <div class="hand">余白に透さんの字で「最初のハンドル。いまでも使ってる」</div></div>`},
+  {id:'archive',name:'アーカイブ',icon:'lock',title:'~/archive/cases',w:460,h:300,flush:true,html:`<div class="term"><div class="out">$ ls ~/archive/cases/
+  2026_utsuro.enc
+  2029_xxxxx.enc
+  2032_xxxxx.enc
+  2034_xxxxx.enc
+
+$ open 2026_utsuro.enc
+<span class="dim">password required.（捜査ノートに入力）</span></div></div>`}
+ ]
+},
+{
+ id:1,no:'第一章',title:'別れの投稿',theme:'y2026',mark:'ghostwire',clock:'2026/10/19 01:12',where:'情報工学棟 7階 研究室',
+ narr:[[M,'「ログは嘘をつかない」。透さんが最初にそれを知ったのは、二十歳のとき、後輩から届いたメッセージがきっかけだったという。','frame'],
+  ['','2026年10月19日、月曜日。午前一時を過ぎた情報工学棟の七階には、篠宮透のほかに誰もいなかった。'],
+  ['','スマホが震えた。ゼミの一つ下の後輩、水野架純からだった。'],
+  ['透','本人が書いた文章かどうかは、言葉より先にログが教えてくれる。いつ、どこから、何で書かれたか。']],
+ chat:{with:'水野 架純',msgs:[['水野 架純','01:04','先輩、急にすみません。兄と9日間連絡が取れないんです。'],['水野 架純','01:04','警察には行きました。でもブログに「探さないでくれ」って書いてあるから、家出だろうって。'],['水野 架純','01:05','兄はあんな文章書かないです。兄のブログの管理画面と、家族で使ってる位置共有は見られます。'],['me','01:07','ログ全部ちょうだい。消える前に。']]},
+ open:['chat'],
+ steps:[
+  {type:'multi',q:'「お別れ」の記事を遼本人が書いたとは考えにくい根拠を、すべて選べ。',
+   options:['記号が半角になっている','一人称が「俺」になっている','下書き保存をせずに公開されている','スマホから投稿されている','深夜に投稿されている','本文が短い'],
+   answer:[0,1,2],
+   why:sel=>sel.includes(3)?'その夜、遼は自分のスマホで下書きを書いている。スマホから投稿されたこと自体は不自然ではない。'
+     :sel.includes(4)?'遼はいつも夜遅くに記事を書いている。深夜であることは根拠にならない。'
+     :sel.includes(5)?'短さだけでは本人かどうか決められない。書き方の癖を比べよう。':'まだ足りない根拠がある。過去の記事と管理画面のログを見比べよう。',
+   memo:'「お別れ」は文体（半角記号・一人称「俺」）と手順（下書きなし）が遼の習慣と違う。'},
+  {type:'text',q:'「お別れ」が公開された瞬間、遼のスマホはどこにあった？（地名）',
+   check:v=>/月見台二丁目|月見台2丁目|月見台/.test(v),
+   traps:[[/渋谷|道玄坂/,'管理画面と位置共有で、時刻の表記がそろっているか確かめよう。'],[/中野|自宅/,'その時刻、スマホは家にはなかった。']],
+   memo:'公開は 10/10 18:52 UTC = 10/11 03:52（日本時間）。スマホは月見台二丁目。04:20 に電源が切れた。'}
+ ],
+ hints:['過去の記事の書き方の癖（記号、一人称）と、「お別れ」を比べよう。','管理画面の時刻はUTC（協定世界時）。日本時間はUTCに9時間足す。','10/10 18:52 UTC は、日本時間で 10/11 の何時か。その時刻の位置記録を探そう。'],
+ solved:`<p>「お別れ」は遼の書き方ではない。しかも公開されたのは日本時間の 10/11 03:52、スマホは<b>月見台二丁目</b>にあった。その1時間前、遼自身がスマホで書いた下書きが残っている。「例の建物の前」「管理会社の人が中を見せてくれる」。</p>
+ <p>遼のブラウザ履歴には、深夜3時台に同じURLが何度も出てくる。<span class="mono">utsuro.tv</span>。サイト名は「うつろ放送」。</p>`,
+ apps:[
+  {id:'blog',name:'遼のブログ',icon:'web',title:'夜更けの取材帳',w:480,h:470,flush:true,html:browser('yofuke-shuzai.example/ryo',`<div class="cap">遼のブログ「夜更けの取材帳」より、直近の記事</div>
+   <div class="doc"><div class="meta">2026/10/03</div><h4>【検証】心霊トンネルのオーブ、全部虫でした！？</h4>結論から言うと、マジで虫です！！ 赤外線ライトに寄ってくる羽虫が、ボケてオーブに見えるだけ。僕はちょっとがっかりしました…！</div>
+   <div class="doc"><div class="meta">2026/10/08</div><h4>「無人放送」という配信を知ってるか？</h4>毎晩3時33分、誰もいない部屋が11分だけ配信される。人が映ったら、映った人は「招かれる」らしい。……いや、僕は絶対からくりがあると思う！ 次の記事で正体を暴きます！？</div>
+   <div class="doc"><div class="meta">2026/10/11</div><h4>お別れ</h4>部屋に人が映った. 次は俺の番らしい. 探さないでくれ.<br>今までありがとう.</div>`)},
+  {id:'admin',name:'管理画面',icon:'sheet',title:'ブログ管理画面 › 操作履歴',w:540,h:330,html:`<div class="cap">時刻はすべて UTC（協定世界時）</div>
+   <div class="tablewrap"><table>
+    <tr><th>日時 (UTC)</th><th>操作</th><th>記事</th><th>投稿元</th></tr>
+    <tr><td class="m">10/03 13:41</td><td>下書き保存</td><td>心霊トンネル…</td><td>PC</td></tr>
+    <tr><td class="m">10/03 14:58</td><td>公開</td><td>心霊トンネル…</td><td>PC</td></tr>
+    <tr><td class="m">10/08 11:12</td><td>下書き保存</td><td>「無人放送」という…</td><td>PC</td></tr>
+    <tr><td class="m">10/08 12:14</td><td>公開</td><td>「無人放送」という…</td><td>PC</td></tr>
+    <tr><td class="m">10/10 17:58</td><td>下書き保存</td><td>無人放送の正体（仮）</td><td>スマホアプリ</td></tr>
+    <tr><td class="m">10/10 18:52</td><td>公開</td><td>お別れ</td><td>スマホブラウザ</td></tr>
+   </table></div>`},
+  {id:'draft',name:'下書き',icon:'doc',title:'下書き「無人放送の正体（仮）」',w:420,h:300,html:`<div class="doc draft"><div class="meta">最終保存 10/10 17:58 UTC ・ スマホアプリ</div><h4>無人放送の正体（仮）</h4>いま例の建物の前！ 管理会社の人が、特別に中を見せてくれるらしい。マジか！？<br>僕の読みが当たっていれば、あの配信は……</div>
+   <div class="cap">本文はここで途切れている。</div>`},
+  {id:'loc',name:'位置共有',icon:'pin',title:'家族の位置共有 › りょう',w:420,h:360,html:`<div class="cap">「りょう」の端末（時刻は日本時間）</div>
+   <div class="tablewrap"><table>
+    <tr><th>日時 (JST)</th><th>位置</th><th>精度</th></tr>
+    <tr><td class="m">10/10 18:50</td><td>渋谷区 道玄坂</td><td class="m">±25m</td></tr>
+    <tr><td class="m">10/10 22:40</td><td>中野区 自宅</td><td class="m">±12m</td></tr>
+    <tr><td class="m">10/11 00:05</td><td>東湾線 月見台駅</td><td class="m">±40m</td></tr>
+    <tr><td class="m">10/11 01:30</td><td>月見台二丁目</td><td class="m">±18m</td></tr>
+    <tr><td class="m">10/11 03:10</td><td>月見台二丁目</td><td class="m">±15m</td></tr>
+    <tr><td class="m">10/11 03:50</td><td>月見台二丁目</td><td class="m">±15m</td></tr>
+    <tr><td class="m">10/11 04:20</td><td>記録なし（電源オフ）</td><td class="m"></td></tr>
+   </table></div>`}
+ ]
+},
+{
+ id:2,no:'第二章',title:'うつろの部屋',theme:'y2026',mark:'ghostwire',clock:'2026/10/20 03:33',where:'透のアパート',
+ narr:[[M,'透さんは今でも、窓のある部屋の写真を見るとまず時計を探す。癖になったのはこの夜からだと、笑っていた。','frame'],
+  ['','10月20日、火曜日。午前三時三十二分。透は自分のアパートで、明かりを消してノートパソコンの前に座っていた。'],
+  ['','3時33分。ブックマークを開くと、黒い画面がふっと明るくなった。'],
+  ['','畳の和室。押入れ、壁掛け時計、窓の外には踏切と看板の灯り。誰もいない。視聴者は12人。コメント欄は止まったまま。'],
+  ['透','霊は住所を持たない。でも部屋は持っている。窓の外、音、電気。映像には撮った場所が必ず残る。']],
+ open:['stream'],
+ steps:[
+  {type:'choice',q:'配信の音から、部屋の近くを通っている貨物線はどれ？',
+   options:['北総貨物線','東湾貨物線','西鶴臨港線'],answer:1,
+   why:i=>i===0?'通過時刻が、配信時間（03:33〜03:44）に入っているか確かめよう。':'電源ノイズの周波数は何Hzだったか。',
+   memo:'電源ノイズは50Hz（東日本）。03:38と03:41の通過音に合うのは東湾貨物線。'},
+  {type:'text',q:'窓の外に見える看板の店名は？',
+   check:v=>/^(コイン)?ツキミランドリー$|^つきみらんどりー$/.test(v),
+   traps:[[/ーリドンラ|ミキツ/,'そのまま読むとおかしい。この映像は何かが反転していないか？'],[/コインランドリー月見|ランドリー月見/,'似た名前の別の店がある。看板の文字の順番をよく見よう。']],
+   memo:'映像は左右反転している（時計の数字が逆）。看板は「ツキミ ランドリー」。'},
+  {type:'text',q:'配信されている部屋がある建物の名前は？（地図で探そう）',
+   check:v=>/コーポ月見台|こーぽつきみだい/.test(v),
+   traps:[[/白鷺/,'その建物の窓から、店の看板は読めるだろうか。'],[/メゾン/,'その建物の窓から、看板の表は見えるだろうか。看板がどの壁についているか確かめよう。'],[/北総/,'その近くの店は「ツキミ ランドリー」ではない。']],
+   memo:'窓から看板と、その右に踏切が見える建物は「コーポ月見台」。'}
+ ],
+ hints:['壁の時計を見よう。数字の並びが逆になっている。','映像では踏切が看板の左に見える。でも映像は反転しているので、実際には踏切は看板の右にある。','地図で「ランドリー」を検索。看板の向きと、周りの建物の窓の向きを確かめよう。窓から外を見て、看板の右に踏切が見える建物は？'],
+ solved:`<p>部屋は<b>コーポ月見台</b>にある。地図の口コミには「3階の東の角部屋、何年も空いてるのに、夜中にカーテンの隙間が光ってる」。</p>
+ <p>事故物件サイトによれば、2021年3月14日、コーポ月見台の3階で住人の女性が亡くなっている。部屋番号は伏せられていた。</p>
+ <p>気になることがひとつ。東湾貨物線は平日しか走らない。なのに、日曜（10/18）の配信にも3:38の通過音が入っていた。</p>`,
+ apps:[
+  {id:'stream',name:'うつろ放送',icon:'rec',title:'うつろ放送 ― LIVE',w:600,h:480,flush:true,html:browser('utsuro.tv/live',`${stream(roomSVG(),'LIVE うつろ放送','03:35:12<br>視聴 12')}
+   <div class="cap">10/20（火）03:35 のスクリーンショット。窓の外に踏切と看板、正面の壁に時計。</div>`)},
+  {id:'audio',name:'音声解析',icon:'wave',title:'Spectra ― utsuro_1020.wav',w:480,h:430,html:`<b>低周波スペクトル（03:33〜03:44）</b>
+   <div><div class="spec">${[6,8,7,9,10,12,14,96,22,12,9,8,8,30,9,7,6,7,6,5].map((h,i)=>`<i class="${i==7?'pk':''}" style="height:${h}%"></i>`).join('')}</div>
+   <div class="speclab"><span>0 Hz</span><span>▲ 50 Hz</span><span>100 Hz</span><span>200 Hz</span></div></div>
+   <div class="cap">家庭の電源から漏れるハム音。東日本は50Hz、西日本は60Hz。</div>
+   <b>環境音の検出</b>
+   <div class="tablewrap"><table><tr><th>時刻</th><th>音</th><th>特徴</th></tr>
+    <tr><td class="m">03:38</td><td>列車通過音</td><td>重く長い。約40秒</td></tr>
+    <tr><td class="m">03:41</td><td>列車通過音</td><td>重く長い。約45秒</td></tr></table></div>`},
+  {id:'freight',name:'貨物時刻表',icon:'web',title:'深夜貨物まとめ',w:540,h:290,flush:true,html:browser('kamotsu-matome.example/night',`<div class="cap">深夜帯の貨物列車 通過時刻（抜粋）</div>
+   <div class="tablewrap"><table><tr><th>路線</th><th>地域</th><th>通過時刻</th><th>運行日</th></tr>
+    <tr><td>北総貨物線</td><td>関東</td><td class="m">03:12 / 03:55</td><td>毎日</td></tr>
+    <tr><td>東湾貨物線</td><td>関東</td><td class="m">03:38 / 03:41</td><td>平日のみ</td></tr>
+    <tr><td>西鶴臨港線</td><td>近畿</td><td class="m">03:38 / 03:41</td><td>毎日</td></tr></table></div>`)},
+  {id:'map',name:'地図',icon:'map',title:'地図 ― 月見台',w:560,h:600,flush:true,init:initMap,html:`<div class="mapapp" id="mapapp">
+    <div class="mapbar"><input type="text" id="mq" placeholder="月見台周辺を検索（例：ランドリー）" aria-label="地図を検索"><label for="mrail"><input type="checkbox" id="mrail"> 鉄道</label></div>
+    <div class="results" id="mres"></div>
+    <div class="mapview" id="mapview"></div>
+    <div id="pcard"></div></div>`}
+ ]
+},
+{
+ id:3,no:'第三章',title:'サイトの持ち主',theme:'y2026',mark:'ghostwire',clock:'2026/10/20 14:05',where:'情報工学棟 7階 研究室',
+ narr:[[M,'「当時はまだ、手作りのスクリプトで調べてたんだよ」。ファイルには、学生だった透さんのシェル履歴がそのまま残っていた。','frame'],
+  ['','建物はわかった。次は部屋と、この配信を続けている人間だ。'],
+  ['','サイトは消えても、痕跡は残る。ソースのコメント、ドメインの登録記録、誰かが保存した古い版。遼のPCには、彼が途中まで打ったコマンドの履歴も残っていた。'],
+  ['透','端末で調べよう。help でコマンド一覧、history で遼の履歴が見られる。']],
+ open:['term'],
+ steps:[
+  {type:'text',q:'うつろ放送と同じ持ち主が運営している、もう一つのサイトのドメインは？',
+   check:v=>/kuga-housing(\.jp)?|久我ハウジング/.test(v),
+   memo:'うつろ放送と kuga-housing.jp（久我ハウジング管理）は同じ解析アカウント。持ち主は同じ。'},
+  {type:'text',q:'配信されている部屋は何号室？',
+   check:v=>/^302(号室|号)?$/.test(v),
+   traps:[[/^30[13]/,'カメラが接続していたWi-Fiの名前に、方角が入っている。'],[/^3$|^3階/,'階まではわかった。何号室かまで絞ろう。']],
+   memo:'2021年のカメラ画面のWi-Fi名「KH-CORPO-3F-E」＝3階東。間取り図で3階東は302号室。'}
+ ],
+ hints:['まず history で、遼が何を調べていたか見よう。次に view-source utsuro.tv。','ソースにある解析ID（UA-…）を analytics で逆引きしよう。','wayback utsuro.tv で一番古い版を開き、カメラ画面のWi-Fi名を見る。kuga-housing.jp の物件ページに間取りがある。'],
+ solved:`<p>部屋は<b>302号室</b>。2021年に募集を止めたまま、5年間空室になっている。</p>
+ <p>管理会社は久我ハウジング管理。担当は<b>久我 圭吾</b>。電話をかけると、久我は穏やかに答えた。「302号室ですか。あそこはずっと空いてますよ。……出る、って噂があるもので」</p>`,
+ apps:[
+  {id:'term',name:'端末',icon:'term',title:'ghostwire@x13: ~',w:620,h:480,flush:true,init:initTerm,html:`<div class="term"><div class="out" id="tout"></div>
+   <form id="tform"><span>$</span><input id="tin" autocomplete="off" spellcheck="false" aria-label="コマンド入力" placeholder="help"></form>
+   <div class="chips" id="tchips"></div></div>`},
+  {id:'site',name:'utsuro.tv',icon:'web',title:'うつろ放送',w:460,h:320,flush:true,html:`<div class="addr">${icon('web')}<span>https://utsuro.tv/</span></div><div class="site"><div class="body">
+    <div class="t">うつろ放送</div><p>毎夜、三時三十三分。うつろの部屋をお見せします。</p><p>部屋に誰かが映ったら、その方は招かれます。</p>
+    <p style="margin-top:14px;font-size:12px;font-family:var(--f-ui)">会員限定アーカイブ（月額 980円）</p></div></div>`}
+ ]
+},
+{
+ id:4,no:'第四章',title:'録画マニア',theme:'y2026',mark:'ghostwire',clock:'2026/10/22 01:00',where:'月見台駅前 ファミリーレストラン',
+ narr:[[M,'灯籠さんの名前は、事務所の連絡先に今も残っている。透さんとの最後のやりとりは、三年前で止まっていた。','frame'],
+  ['','その夜、透は廃墟アーカイブ掲示板に書き込んだ。過去の配信の録画を探しています。返信は、配信が終わった三時四十四分に来た。'],
+  ['透','ライブの映像なら、同じ部屋でも毎晩ノイズが違うので、ハッシュ値は重ならない。1文字でも違えば別のデータ。完全に一致すれば、同じデータがもう一度流されたということだ。']],
+ chat:{with:'灯籠',msgs:[['灯籠','03:44','あんた、水野さんの知り合いか。俺は5年間、毎晩あの配信を録画してる。'],['灯籠','03:46','10/11、確かに人が映った。暗すぎて誰も信じなかったけどな。それと、最近の配信は何かおかしい。毎晩、見覚えがある。'],['灯籠','03:47','配信のデータは作り直さずにそのまま保存してある。各夜の 03:35 を含む区間のハッシュ値を送る。あとは自分で見てくれ。']]},
+ open:['chat'],
+ steps:[
+  {type:'text',q:'配信が「過去の録画」に差し替えられたのは、何月何日の配信から？',
+   check:v=>dateRe('10/12').test(v),
+   traps:[[dateRe('10/11'),'10/11 の映像は、他のどの日とも一致しない。'],[dateRe('10/15'),'もっと前から、同じ値が出てきていないか。']],
+   memo:'10/12 以降の配信は、過去の映像と完全に一致する。差し替えが始まったのは10/12。'},
+  {type:'choice',q:'ループに使われているのは、いつの映像？',
+   options:['10/05〜10/07','10/06〜10/08','10/07〜10/09','10/09〜10/11'],answer:1,
+   why:()=>'10/12、10/13、10/14 がそれぞれどの日と一致するか、順に比べよう。',
+   memo:'ループの素材は 10/06〜10/08 の3日分。10/18（日）に貨物の音が入っていたのは、平日の映像だから。'},
+  {type:'text',q:'10/11 の映像で、奥に立つ男の手首にあるものは？',
+   check:v=>/時計|とけい|watch/.test(v),
+   traps:[[/スマホ|携帯|電話/,'それは手前の人影が持っているもの。奥の男の手首を見よう。']],
+   memo:'10/11 の配信には、スマホを持った遼と、腕時計をした男が映っていた。'}
+ ],
+ hints:['表の行を2つタップすると、ハッシュ値を1文字ずつ比較できる。','10/11 より後の行を、それより前の行と最後の1文字まで比べよう。完全に一致する最初の日はいつか。','10/11 の映像は明るさ補正を最大近くまで上げよう。奥の人影の右手首に、小さく光るものがある。'],
+ solved:`<p><b>10/12</b>以降の配信は、10/06〜10/08 の映像を3日ずつ繰り返していた。</p>
+ <p>10/11 の映像を明るくすると、人影が二つ浮かび上がる。スマホを握った遼と、その背後に立つ男。男の手首で、<b>腕時計</b>が光った。</p>
+ <p>配信は、遼が消えた夜までは本物のライブだった。映ったのは霊ではない。生きている人間だった。</p>`,
+ apps:[
+  {id:'hash',name:'ハッシュ値',icon:'sheet',title:'hashes_1005-1018.csv ― 灯籠から',w:560,h:520,init:initHash,html:`<div class="cap">各夜 03:35 を含む配信データ（SHA-256 先頭16桁）。行を2つタップすると比較できます。</div>
+   <div class="tablewrap"><table id="htab"><tr><th>配信日</th><th>曜日</th><th>ハッシュ値</th><th>灯籠のメモ</th></tr>
+    ${HASH.map((r,i)=>`<tr class="pick" data-h="${i}" tabindex="0"><td class="m">${r[0]}</td><td>${r[1]}</td><td class="m">${r[2]}</td><td>${r[3]}</td></tr>`).join('')}</table></div>
+   <div class="cmp" id="hcmp"><span class="verdict">比較する2行を選んでください。</span></div>`},
+  {id:'video',name:'10/11 の録画',icon:'rec',title:'rec_1011_033612.png ― 灯籠の録画',w:580,h:470,init:initBright,html:`<div id="enh">${stream(roomSVG({dark:true,figures:true}),'LIVE うつろ放送','10/11 03:36:12<br>視聴 9')}</div>
+   <label class="slider" for="br">明るさ補正<input type="range" id="br" min="1" max="8" step="0.1" value="1"><span class="mono" id="brv">×1.0</span></label>
+   <div class="cap">灯籠の録画から切り出した1フレーム。</div>`}
+ ]
+},
+{
+ id:5,no:'第五章',title:'招かれた者',theme:'y2026',mark:'ghostwire',clock:'2026/10/22 18:25',where:'コーポ月見台 302号室',
+ narr:[[M,'この先を話すとき、透さんはいつも少しだけ黙った。そして必ず、最後に花の話をした。','frame'],
+  ['','その日の昼、灯籠からもう一通メッセージが届いていた。'],
+  ['','302号室の内見を申し込んだ。久我は鍵を手に、にこやかに現れた。銀色の腕時計が、袖口からのぞいている。'],
+  ['久我','本当に入ります？ 夜中にね、カメラも何もないのに、あの部屋が映るって噂があるんですよ。'],
+  ['','カメラがないはずの部屋。けれど天井の隅には、ネジ穴が四つ残っていた。']],
+ chat:{with:'灯籠',msgs:[['灯籠','12:31','十二日の配信を、コマ送りで全部見直した。<br>ループのつなぎ目に、一コマだけ変なのが混ざってる。三時四十三分五十九秒。'],['灯籠','12:32','画像を2枚送る。「継ぎ目」で開いてくれ。']]},
+ open:['chat'],
+ steps:[
+  {type:'choice',q:'継ぎ目のフレームから考えて、遼はどこにいる？',
+   options:['天井裏','押入れ','床下','窓の外'],answer:1,
+   why:()=>'2枚の画像を「差分」で重ねると、違うところだけが光る。',
+   memo:'継ぎ目のフレームだけ、押入れの襖が指一本ぶん開いていた。'},
+  {type:'choice',q:'犯人は誰？',
+   options:['黒澄 レイ','遼の元恋人','灯籠','久我 圭吾'],answer:3,
+   why:i=>['黒澄レイには、その時間に別の場所で生配信をしていた記録がある。','元恋人は、その夜は沖縄にいた。','灯籠は302号室の鍵を持っていない。録画を渡したのも彼だ。'][i],
+   memo:'犯人は久我圭吾。'},
+  {type:'multi',q:'久我が犯人だと示す証拠を、すべて選べ。',
+   options:['うつろ放送と久我ハウジング管理の解析IDが同じ','302号室の鍵を管理しているのは久我','10/11の男の腕時計と、久我の銀色の腕時計','10/12から配信が録画に差し替えられた','黒澄レイと遼がネタで揉めていた','「お別れ」がスマホから投稿された'],
+   answer:[0,1,2],
+   why:sel=>sel.some(i=>i>=3)?'選んだ中に、誰がやったかまでは示さない事実がある。久我と直接つながるものだけを選ぼう。':'まだ足りない。サイト、鍵、映像の3つの方向から考えよう。',
+   memo:'配信の持ち主、鍵、映像の腕時計。3つがすべて久我を指している。'}
+ ],
+ hints:['「継ぎ目」の「差分」ボタンを押して、2枚の画像の違いだけを表示しよう。','「関係者」でアリバイを確認しよう。10/11 の深夜に302号室に入れたのは誰か。','証拠は「誰がやったか」を示すものに限る。起きた出来事そのものは、犯人を示さない。'],
+ solved:`<p>この部屋は出るんですよ、と久我は繰り返した。透は、ひとつずつ答えた。</p>
+ <p>そして押入れの襖を指さした。継ぎ目の一コマで、指一本ぶん開いていた襖だ。</p>`,
+ apps:[
+  {id:'seam',name:'継ぎ目',icon:'diff',title:'継ぎ目のフレーム ― 灯籠から',w:580,h:470,init:initDiff,html:`<div class="seg" role="group" aria-label="表示切替"><button type="button" data-v="a" class="on">素材 03:43:59</button><button type="button" data-v="b">継ぎ目 03:43:59</button><button type="button" data-v="d">差分</button></div>
+   <div class="diffbox" id="dbox"><div class="bottom">${roomSVG({noflick:true})}</div><div class="top" id="dtop" hidden>${roomSVG({seam:true,noflick:true})}</div></div>
+   <div class="cap" id="dcap">ループ素材（10/06 の映像）の、同じ 03:43:59 のフレーム。</div>`},
+  {id:'people',name:'関係者',icon:'people',title:'関係者メモ',w:540,h:400,html:`<div class="cards">
+    <div class="card"><b>黒澄 レイ</b>オカルト系配信者。遼とネタの取り合いで揉めていた。<div class="r">10/11 02:00〜05:00 大阪の自宅から生配信（アーカイブあり）</div></div>
+    <div class="card"><b>遼の元恋人</b>失踪前日にLINEで口論。「危ない取材はやめて」<div class="r">10/10〜12 沖縄出張（ホテルの記録あり）</div></div>
+    <div class="card"><b>灯籠</b>5年間録画を続ける古参視聴者。<div class="r">録画データの提供者。302号室の鍵は持っていない</div></div>
+    <div class="card"><b>久我 圭吾</b>久我ハウジング管理。コーポ月見台の担当。<div class="r">302号室の鍵を管理。社員紹介「趣味は古い機械式時計の収集」</div></div></div>`}
+ ]
+}
+];
+
+// ===== 状態 =====
+const KEY='utsuro-save-v4';
+const fresh=()=>({cur:0,done:{},hints:{},nr:{}});
+let S=fresh();
+try{const s=JSON.parse(localStorage.getItem(KEY)||'null');if(s&&Number.isInteger(s.cur)&&s.cur>=0&&s.cur<CH.length&&s.done)S=Object.assign(fresh(),s)}catch(e){}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+function norm(s){return (s||'').normalize('NFKC').replace(/\s+/g,'').toLowerCase()}
+function esc(s){return String(s).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]))}
+const stepDone=(c,i)=>!!S.done[c.id+'-'+i];
+const chDone=c=>c.steps.every((_,i)=>stepDone(c,i));
+const unlocked=i=>i===0||chDone(CH[i-1]);
+const $=id=>document.getElementById(id);
+const media=q=>!!window.matchMedia?.(q).matches;
+const reduceMotion=media('(prefers-reduced-motion: reduce)');
+
+// ===== 捜査ノート（小問の回答） =====
+function stepHTML(c,st,i){
+  const n=`<div class="num">${c.id?`Q${c.id}-${i+1}`:'序'}</div>`;
+  if(stepDone(c,i))return `<div class="done-step">${n}${st.q}<br><b>✓ ${esc(S.done[c.id+'-'+i])}</b></div>`;
+  let body='';
+  if(st.type==='text')body=`<form class="ans" data-s="${i}"><input type="text" id="in-${c.id}-${i}" autocomplete="off" aria-label="回答" placeholder="答えを入力"><button class="btn" type="submit">回答する</button></form>`;
+  if(st.type==='choice')body=`<form class="ans" data-s="${i}"><select id="in-${c.id}-${i}" aria-label="選択"><option value="">選ぶ</option>${st.options.map((o,j)=>`<option value="${j}">${o}</option>`).join('')}</select><button class="btn" type="submit">回答する</button></form>`;
+  if(st.type==='multi')body=`<form data-s="${i}"><div class="opts">${st.options.map((o,j)=>`<label for="in-${c.id}-${i}-${j}"><input type="checkbox" id="in-${c.id}-${i}-${j}" value="${j}">${o}</label>`).join('')}</div><button class="btn" type="submit">回答する</button></form>`;
+  return `<div class="task">${n}<div class="q">${st.q}</div>${body}<div class="feedback" id="fb-${i}"></div></div>`;
+}
+function noteHTML(){
+  const c=CH[S.cur],first=c.steps.findIndex((_,i)=>!stepDone(c,i));
+  const shown=first===-1?c.steps.length:first+1,hn=S.hints[c.id]||0,done=chDone(c);
+  const hints=done?'':`<div class="hints">${c.hints.slice(0,hn).map((h,i)=>`<div class="hint">ヒント${i+1}：${h}</div>`).join('')}
+   ${hn<c.hints.length?`<button class="btn ghost sm" type="button" id="hbtn" style="align-self:flex-start">ヒントを見る（${hn+1}/${c.hints.length}）</button>`:''}</div>`;
+  const last=S.cur===CH.length-1,label=S.cur===0?'2026_utsuro を開く':last?'事件ファイルを閉じる':'次の章へ';
+  const sol=done?`<div class="solved"><div class="num" style="color:var(--ok);font-family:var(--f-mono);font-size:11px;letter-spacing:.12em">解明</div>${c.solved}<button class="btn" id="nx" type="button">${label}</button></div>`:'';
+  const memos=[];CH.forEach(x=>x.steps.forEach((st,i)=>{if(stepDone(x,i))memos.push(`<li><span class="mono" style="color:var(--muted)">${x.id?`Q${x.id}-${i+1}`:'序'}</span> ${st.memo}</li>`)}));
+  return `<div class="nt-head"><b>${c.no}　${c.title}</b><span>${c.clock} ・ ${c.where}</span></div>
+   <h3>いまの疑問</h3><div class="steps">${c.steps.slice(0,shown).map((st,i)=>stepHTML(c,st,i)).join('')}${hints}${sol}</div>
+   <h3>わかったこと</h3>${memos.length?`<ol class="memo-list">${memos.join('')}</ol>`:'<div class="cap">小問を解くと、わかったことがここにたまっていく。</div>'}`;
+}
+function initNote(el){
+  const c=CH[S.cur];
+  el.querySelectorAll('form[data-s]').forEach(f=>f.onsubmit=e=>{e.preventDefault();answer(c,+f.dataset.s,f)});
+  const hb=el.querySelector('#hbtn'); if(hb)hb.onclick=()=>{S.hints[c.id]=(S.hints[c.id]||0)+1;save();refreshNote()};
+  const nx=el.querySelector('#nx'); if(nx)nx.onclick=()=>S.cur===CH.length-1?showEnding():enterChapter(S.cur+1);
+}
+function refreshNote(){const w=WIN.note;if(!w)return;const bd=w.querySelector('.bd');bd.innerHTML=noteHTML();initNote(w)}
+function answer(c,i,f){
+  const st=c.steps[i],fb=$('fb-'+i);
+  const bad=m=>{fb.className='feedback bad';fb.textContent=m};
+  let shown='';
+  if(st.type==='text'){
+    const raw=f.querySelector('input').value,v=norm(raw);
+    if(!v)return bad('答えを入力してください。');
+    if(!st.check(v)){const t=(st.traps||[]).find(t=>t[0].test(v));return bad(t?t[1]:'証拠と合わない。資料をもう一度見直そう。')}
+    shown=raw.trim();
+  }else if(st.type==='choice'){
+    const v=f.querySelector('select').value;
+    if(v==='')return bad('選択肢から選んでください。');
+    if(+v!==st.answer)return bad(st.why(+v));
+    shown=st.options[st.answer];
+  }else{
+    const sel=[...f.querySelectorAll('input:checked')].map(x=>+x.value);
+    if(!sel.length)return bad('当てはまるものを選んでください。');
+    if(!(sel.length===st.answer.length&&st.answer.every(a=>sel.includes(a))))return bad(st.why(sel));
+    shown=st.answer.map(a=>st.options[a]).join(' ／ ');
+  }
+  S.done[c.id+'-'+i]=shown;save();refreshNote();renderMenu();
+  if(chDone(c))narrate(solvedLines(c));
+  const nxt=$('in-'+c.id+'-'+(i+1))||$('in-'+c.id+'-'+(i+1)+'-0');
+  if(nxt)nxt.focus({preventScroll:true});
+}
+const solvedLines=c=>c.solved.split(/<\/p>/).map(s=>s.replace(/<[^>]+>/g,'').trim()).filter(Boolean).map(t=>['',t]);
+
+// ===== ウィンドウ =====
+let WIN={},zTop=10,cascade=0;
+function chatApp(c){
+  const ch=c.chat;
+  return {id:'chat',name:'メッセージ',icon:'chat',title:`メッセージ ― ${ch.with}`,w:380,h:470,flush:true,
+   html:`<div class="chathead"><span class="av">${ch.with.slice(0,1)}</span><b>${ch.with}</b></div><div class="chat">
+    ${ch.msgs.map(m=>`<div class="bubble ${m[0]==='me'?'me':''}"><span class="n">${m[0]==='me'?(c.id?'透':'ミオ'):m[0]} ・ ${m[1]}</span>${m[2]}</div>`).join('')}
+    ${ch.tail?`<div class="cap" style="align-self:flex-end">${ch.tail}</div>`:''}</div>`};
+}
+const NOTE={id:'note',name:'捜査ノート',icon:'note',title:'捜査ノート',w:420,h:600,right:true,html:noteHTML,init:initNote};
+function appsOf(c){return [...(c.chat?[chatApp(c)]:[]),...c.apps,NOTE]}
+function openApp(id){
+  if(WIN[id]){WIN[id].hidden=false;focusWin(id);renderTasks();return}
+  const a=appsOf(CH[S.cur]).find(x=>x.id===id); if(!a)return;
+  const d=$('desk'),dw=d.clientWidth||1024,dh=d.clientHeight||700;
+  const w=Math.min(a.w,dw-16),h=Math.min(a.h,dh-16),n=cascade++%6;
+  const x=a.right?dw-w-16:110+n*30,y=a.right?12:14+n*26;
+  const el=document.createElement('section');
+  el.className='win';el.dataset.win=id;el.setAttribute('aria-label',a.title);
+  el.style.cssText=`left:${Math.max(8,Math.min(x,dw-w-8))}px;top:${Math.max(8,Math.min(y,dh-h-8))}px;width:${w}px;height:${h}px`;
+  el.innerHTML=`<div class="tb"><span class="ti">${icon(a.icon)}${a.title}</span><button type="button" class="wb" data-min aria-label="最小化">–</button><button type="button" class="wb x" data-close aria-label="閉じる">×</button></div><div class="bd ${a.flush?'flush':''}">${typeof a.html==='function'?a.html():a.html}</div>`;
+  $('wins').appendChild(el);WIN[id]=el;
+  el.addEventListener('pointerdown',()=>focusWin(id));
+  el.querySelector('[data-close]').onclick=()=>{el.remove();delete WIN[id];renderTasks()};
+  el.querySelector('[data-min]').onclick=()=>{el.hidden=true;renderTasks()};
+  makeDraggable(el);
+  if(a.init)a.init(el);
+  focusWin(id);renderTasks();
+}
+function focusWin(id){
+  Object.values(WIN).forEach(w=>w.classList.remove('on'));
+  const w=WIN[id];w.classList.add('on');w.style.zIndex=++zTop;renderTasks();
+}
+function makeDraggable(el){
+  const tb=el.querySelector('.tb');
+  tb.addEventListener('pointerdown',e=>{
+    if(e.target.closest('button')||media('(max-width:760px)'))return;
+    const d=$('desk'),dx=e.clientX-el.offsetLeft,dy=e.clientY-el.offsetTop;
+    tb.setPointerCapture(e.pointerId);
+    const move=ev=>{
+      el.style.left=Math.max(80-el.offsetWidth,Math.min(ev.clientX-dx,d.clientWidth-80))+'px';
+      el.style.top=Math.max(0,Math.min(ev.clientY-dy,d.clientHeight-34))+'px';};
+    const up=()=>{tb.removeEventListener('pointermove',move);tb.removeEventListener('pointerup',up)};
+    tb.addEventListener('pointermove',move);tb.addEventListener('pointerup',up);
+  });
+}
+function renderTasks(){
+  const t=$('tasks');
+  t.innerHTML=Object.entries(WIN).map(([id,w])=>`<button type="button" data-task="${id}" class="${w.classList.contains('on')&&!w.hidden?'on':''} ${w.hidden?'min':''}">${w.querySelector('.ti').innerHTML}</button>`).join('');
+  t.querySelectorAll('[data-task]').forEach(b=>b.onclick=()=>{
+    const w=WIN[b.dataset.task];
+    if(w.hidden){w.hidden=false;focusWin(b.dataset.task)}
+    else if(w.classList.contains('on')){w.hidden=true;w.classList.remove('on');renderTasks()}
+    else focusWin(b.dataset.task);
+  });
+}
+
+// ===== 語り =====
+let NR={lines:[],i:0,timer:null,typing:false,key:null};
+function narrate(lines,start=0,key=null){NR={...NR,lines,i:Math.min(start,lines.length-1),key};showNarr(true);showLine()}
+function showNarr(on){$('narr').hidden=!on;$('narrBtn').hidden=on;$('desk').classList.toggle('nr-on',on)}
+function showLine(){
+  const box=$('narr'),[who,text,kind]=NR.lines[NR.i],last=NR.i===NR.lines.length-1;
+  box.innerHTML=`<div class="who ${kind||''}">${kind==='frame'?'2036 ・ ミオ':who}</div><div class="txt ${kind||''}"></div>
+   <div class="ctl"><span>${NR.i+1} / ${NR.lines.length}${last?'　― 捜査ノートとアプリで調べよう':''}</span><button type="button" data-nb aria-label="前へ">‹</button><button type="button" data-nf aria-label="次へ">›</button><button type="button" data-nh>隠す</button></div>`;
+  const txt=box.querySelector('.txt');
+  clearInterval(NR.timer);
+  const finish=()=>{clearInterval(NR.timer);NR.typing=false;txt.textContent=text;if(!last)txt.insertAdjacentHTML('beforeend','<span class="more" aria-hidden="true">▼</span>')};
+  if(reduceMotion)finish();
+  else{let n=0;NR.typing=true;NR.timer=setInterval(()=>{n+=1;txt.textContent=text.slice(0,n);if(n>=text.length)finish()},26);NR.finish=finish}
+  if(NR.key!==null){S.nr[NR.key]=NR.i;save()}
+  box.querySelector('[data-nb]').onclick=e=>{e.stopPropagation();if(NR.i>0){NR.i--;showLine()}};
+  box.querySelector('[data-nf]').onclick=e=>{e.stopPropagation();advance()};
+  box.querySelector('[data-nh]').onclick=e=>{e.stopPropagation();showNarr(false)};
+}
+function advance(){if(NR.typing){NR.finish();return}if(NR.i<NR.lines.length-1){NR.i++;showLine()}}
+
+// ===== 章の切り替え =====
+function renderMenu(){
+  const m=$('menu');
+  m.innerHTML=`<div class="h">事件ファイル 2026_utsuro</div>${CH.map((c,i)=>`<button type="button" data-ch="${i}" class="${i===S.cur?'cur':''}" ${unlocked(i)?'':'disabled'}>${chDone(c)?'✓ ':'　'}${c.no}　${c.title}</button>`).join('')}
+   <hr><button type="button" id="mreset">最初からやり直す</button><button type="button" id="mtitle">タイトルに戻る</button>`;
+  m.querySelectorAll('[data-ch]').forEach(b=>b.onclick=()=>{toggleMenu(false);enterChapter(+b.dataset.ch)});
+  $('mreset').onclick=()=>{
+    m.innerHTML=`<div class="confirm">進行状況を消しますか？ <button class="btn sm" type="button" id="ry">消す</button><button class="btn ghost sm" type="button" id="rn">やめる</button></div>`;
+    $('ry').onclick=()=>{S=fresh();termLog=null;MAP={sel:null,q:'',rails:true};hsel=[];save();toggleMenu(false);enterChapter(0)};
+    $('rn').onclick=renderMenu;};
+  $('mtitle').onclick=()=>{toggleMenu(false);showTitle()};
+}
+function toggleMenu(open){const m=$('menu');m.hidden=!open;$('menuBtn').setAttribute('aria-expanded',String(open));if(open)renderMenu()}
+function toast(who,text,app){
+  document.querySelectorAll('.toast').forEach(t=>t.remove());
+  const t=document.createElement('div');t.className='toast';t.setAttribute('role','status');
+  t.innerHTML=`<span class="tile t-chat" style="width:30px;height:30px;border-radius:8px;display:grid;place-items:center;color:#fff">${icon('chat')}</span><div><b>${who}</b><span>${text}</span></div>`;
+  t.onclick=()=>{t.remove();openApp(app)};
+  $('desk').appendChild(t);setTimeout(()=>t.remove(),6000);
+}
+function enterChapter(i,withCard=true){
+  if(!unlocked(i))i=0;
+  const from=S.cur;S.cur=i;save();
+  const c=CH[i];
+  Object.values(WIN).forEach(w=>w.remove());WIN={};cascade=0;
+  $('screen').className=c.theme;$('desk').dataset.mark=c.mark;
+  $('clock').innerHTML=c.clock.replace(' ','<br>');
+  $('icons').innerHTML=appsOf(c).map(a=>`<button type="button" data-app="${a.id}"><span class="tile t-${a.icon}">${icon(a.icon)}</span><span class="lb">${a.name}</span></button>`).join('');
+  $('icons').querySelectorAll('[data-app]').forEach(b=>b.onclick=()=>openApp(b.dataset.app));
+  openApp('note');c.open.forEach(openApp);
+  if(chDone(c))narrate(solvedLines(c));
+  else narrate(c.narr,Number.isInteger(S.nr[c.id])?S.nr[c.id]:0,c.id);
+  if(c.chat&&!chDone(c)){const m=c.chat.msgs[0];setTimeout(()=>toast(m[0],m[2].replace(/<br>/g,' ').slice(0,40)+'…','chat'),400)}
+  renderMenu();
+  if(withCard)showCard(c,from===0&&i===1);
+}
+function showCard(c,boot){
+  const card=$('card');
+  card.innerHTML=`<div class="boot"></div><div class="no">${c.no}</div><h2>${c.title}</h2><div class="wh">${c.clock} ・ ${c.where}</div>`;
+  card.classList.remove('out');card.setAttribute('aria-hidden','false');
+  const close=()=>{card.classList.add('out');card.setAttribute('aria-hidden','true')};
+  card.onclick=close;
+  if(boot&&!reduceMotion)card.querySelector('.boot').textContent='$ mount 2026_utsuro.img /mnt/case\n  ghostwire-x13 / 2026-10-19 snapshot ... ok\n';
+  setTimeout(close,reduceMotion?900:2600);
+}
+function showTitle(){
+  $('title').hidden=false;
+  $('title').querySelector('.bgv').innerHTML=roomSVG({noflick:true});
+  const st=$('start');st.textContent=Object.keys(S.done).length?'つづきから':'はじめる';
+  st.onclick=()=>{$('title').hidden=true;enterChapter(S.cur)};
+}
+
+// ===== エンディング =====
+function endingHTML(){
+  return `<div class="ending">
+   <div class="eyebrow">解決</div>
+   <h2>招かれた者</h2>
+   <p>「この部屋は出るんですよ」と久我は繰り返した。透はひとつずつ答えた。</p>
+   <p>配信はライブではない。日曜に平日の貨物の音が入っている。ハッシュ値は3日ごとに一致する。サイトの解析IDはあなたの会社と同じ。別れの投稿は、遼のスマホから別の誰かが書いた。そして10/11に映った「人」は霊ではなく、生きていた水野遼と、腕時計をしたあなただ。</p>
+   <p>最後に、ループの継ぎ目。そこだけ押入れの襖が指一本ぶん開いていた。差し替えの作業をした夜、閉め忘れたのだろう。</p>
+   <p>押入れの中で、遼は見つかった。5年前、同じ部屋で亡くなった宮下沙耶の死も、自殺ではなかったことが後にわかる。遼は、灯籠が保存していた5年前の録画に映る男の腕時計から、久我にたどり着いていた。</p>
+   <div class="epi">
+    <div class="eyebrow" style="color:#8fa4c9">その後</div>
+    <p>サーバーは押収され、カメラも撤去された。</p>
+    <p>翌月の3時33分。消し忘れたブックマークを開くと、一度だけ配信が始まった。何もない302号室。窓辺に、誰も置いていないはずの花が一輪あった。</p>
+    <p>11分後に配信は終わり、二度とつながらなかった。どこを探しても、ログは残っていなかった。</p>
+   </div>
+   <div class="present">
+    <div class="frame"><span class="who2">2036 ・ ミオ</span>ファイルの最後のページには、二十歳の透さんの字で一行だけ書いてあった。「この仕事を続ける。理由はまだうまく書けない」</div>
+    <p>翌年、透さんは大学を辞めて、最初の事務所を開いた。最初の依頼人は灯籠さんで、最初の協力者は、警察官を目指すと言い出した水野架純さんだった。</p>
+    <p>その架純さんが今、透さんを取り調べている。「架純には連絡するな」の意味は、まだわからない。</p>
+    <p>ファイルを閉じたのは、午前3時を少し過ぎたころだった。</p>
+    <p>事務所の連絡用アカウントに、メッセージが一通届いた。送り主は、三年前から連絡の途絶えていた灯籠さん。本文はなく、URLがひとつだけ。<span class="mono">utsuro.tv</span>。十年前にサーバーごと押収されて、ドメインも失効したはずのサイト。</p>
+    <p>3時33分。黒い画面がふっと明るくなる。</p>
+    <p>映っていたのは、誰もいない透さんの事務所だった。私の机と、透さんの椅子。窓の外の首都高には、車がほとんど走っていない。本物の窓の外では、今も車が流れているのに。視聴者は1人。窓辺には、花が一輪置いてあった。</p>
+    <p>壁の時計の数字は、反転していなかった。</p>
+   </div>
+   <div class="teaser"><div class="eyebrow" style="color:#8fa4c9">次の事件</div><div class="t">第二話「不在証明」</div>
+    <p>すべてのログが、透さんが犯人だと言っている。ならば、嘘をついているのは誰か。</p></div>
+   <p class="cap">試作版はここまでです。</p>
+   <button type="button" class="back" id="endBack">デスクトップに戻る</button></div>`;
+}
+function showEnding(){
+  const e=$('endov');e.innerHTML=endingHTML();e.hidden=false;e.scrollTop=0;
+  $('endBack').onclick=()=>{e.hidden=true};
+}
+
+// ===== 起動 =====
+$('menuBtn').onclick=()=>toggleMenu($('menu').hidden);
+$('narrBtn').onclick=()=>showNarr(true);
+$('narr').onclick=advance;
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape')toggleMenu(false);
+  if((e.key==='Enter'||e.key===' ')&&e.target===document.body&&!$('narr').hidden){e.preventDefault();advance()}
+});
+document.addEventListener('pointerdown',e=>{if(!$('menu').hidden&&!e.target.closest('#menu,#menuBtn'))toggleMenu(false)});
+if(!unlocked(S.cur))S.cur=0;
+showTitle();
+</script>
