@@ -1132,13 +1132,20 @@ function makeDraggable(el){
 }
 function renderTasks(){
   const t=$('tasks');
-  t.innerHTML=Object.entries(WIN).map(([id,w])=>`<button type="button" data-task="${id}" class="${w.classList.contains('on')&&!w.hidden?'on':''} ${w.hidden?'min':''}">${w.querySelector('.ti').innerHTML}</button>`).join('');
-  t.querySelectorAll('[data-task]').forEach(b=>b.onclick=()=>{
-    const w=WIN[b.dataset.task];
-    if(w.hidden){w.hidden=false;focusWin(b.dataset.task)}
-    else if(w.classList.contains('on')){w.hidden=true;w.classList.remove('on');renderTasks()}
-    else focusWin(b.dataset.task);
-  });
+  // ボタンを作り直すのは開いているウィンドウが変わったときだけにする。ウィンドウに触れるたびに作り直すと、
+  // iPhone の Safari が「タップで新しい要素が現れた（ホバーでメニューが出た）」とみなしてクリックを取り消し、×や入力欄が反応しなくなる
+  const key=Object.entries(WIN).map(([id,w])=>id+':'+w.getAttribute('aria-label')).join('|');
+  if(t.dataset.key!==key){
+    t.dataset.key=key;
+    t.innerHTML=Object.entries(WIN).map(([id,w])=>`<button type="button" data-task="${id}">${w.querySelector('.ti').innerHTML}</button>`).join('');
+    t.querySelectorAll('[data-task]').forEach(b=>b.onclick=()=>{
+      const w=WIN[b.dataset.task];
+      if(w.hidden){w.hidden=false;focusWin(b.dataset.task)}
+      else if(w.classList.contains('on')){w.hidden=true;w.classList.remove('on');renderTasks()}
+      else focusWin(b.dataset.task);
+    });
+  }
+  t.querySelectorAll('[data-task]').forEach(b=>{const w=WIN[b.dataset.task];b.classList.toggle('on',w.classList.contains('on')&&!w.hidden);b.classList.toggle('min',w.hidden)});
 }
 
 // ===== 語り =====
@@ -1262,11 +1269,12 @@ document.addEventListener('keydown',e=>{
 });
 document.addEventListener('pointerdown',e=>{if(!$('menu').hidden&&!e.target.closest('#menu,#menuBtn'))toggleMenu(false)});
 // 入力中は語りをしまう（狭い画面のみ CSS で効く）。下側だけが動くので入力欄は指の下からずれない。
-// 戻すのを遅らせるのは、入力欄の外（「回答する」や×）をタップしたとき、先にレイアウトが動いて別の場所を押したことにならないようにするため
+// 戻すのを遅らせるのは、入力欄の外（「回答する」や×）をタップしたとき、先にレイアウトが動いて別の場所を押したことにならないようにするため。
+// iPhone の Safari はタップ中に仕掛けた 0.4 秒以内のタイマーで要素が現れるとクリックを取り消すことがあるので、それより長くしている
 let typingTimer;
 document.addEventListener('focusin',e=>{if(e.target.matches('.win input:is([type=text],:not([type]))')){clearTimeout(typingTimer);$('desk').classList.add('typing')}});
 document.addEventListener('focusout',()=>{
-  typingTimer=setTimeout(()=>$('desk').classList.remove('typing'),300);
+  typingTimer=setTimeout(()=>$('desk').classList.remove('typing'),500);
   // iPhone はキーボードを出すとページ全体をずらし、閉じても戻さないことがある。ずれたままだとタップ位置が合わなくなるので戻す
   if(window.scrollY)window.scrollTo(0,0);
 });
