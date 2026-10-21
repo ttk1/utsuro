@@ -323,6 +323,12 @@ tr.pick:hover td{background:var(--surface2)}
   .results button{padding:11px 12px}
   .slider input{height:32px}
 }
+/* 大きい画面（4K など）: 見た目はフル HD（ブラウザの枠を除いて約 1920×1000）を基準に作っているので、
+   それより広い画面では UI 全体を段階的に拡大する。高さも条件に入れるのは、横長の画面で縦にはみ出さないようにするため */
+@media (min-width:2400px) and (min-height:1250px){#screen,.over{zoom:1.25}}
+@media (min-width:2880px) and (min-height:1500px){#screen,.over{zoom:1.5}}
+@media (min-width:3360px) and (min-height:1750px){#screen,.over{zoom:1.75}}
+@media (min-width:3840px) and (min-height:2000px){#screen,.over{zoom:2}}
 </style>
 
 <div id="screen" class="y2026">
@@ -868,7 +874,7 @@ $ open 2026_utsuro.enc
     <tr><td>東湾貨物線</td><td>関東</td><td class="m">03:38 / 03:41</td><td>平日のみ</td></tr>
     <tr><td>西鶴臨港線</td><td>近畿</td><td class="m">03:38 / 03:41</td><td>毎日</td></tr></table></div>`)},
   {id:'map',name:'地図',icon:'map',title:'地図 ― 月見台',w:560,h:600,flush:true,init:initMap,html:`<div class="mapapp" id="mapapp">
-    <div class="mapbar"><input type="text" id="mq" placeholder="月見台周辺を検索（例：ランドリー）" aria-label="地図を検索"><label for="mrail"><input type="checkbox" id="mrail"> 鉄道</label></div>
+    <div class="mapbar"><input type="text" id="mq" name="search-map" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="月見台周辺を検索（例：ランドリー）" aria-label="地図を検索"><label for="mrail"><input type="checkbox" id="mrail"> 鉄道</label></div>
     <div class="results" id="mres"></div>
     <div class="mapview" id="mapview"></div>
     <div id="pcard"></div></div>`}
@@ -895,7 +901,7 @@ $ open 2026_utsuro.enc
  <p>管理会社は久我ハウジング管理。担当は<b>久我 圭吾</b>。電話をかけると、久我は穏やかに答えた。「302号室ですか。あそこはずっと空いてますよ。……出る、って噂があるもので」</p>`,
  apps:[
   {id:'term',name:'端末',icon:'term',title:'ghostwire@x13: ~',w:620,h:480,flush:true,init:initTerm,html:`<div class="term"><div class="out" id="tout"></div>
-   <form id="tform"><span>$</span><input id="tin" autocomplete="off" spellcheck="false" aria-label="コマンド入力" placeholder="help"></form>
+   <form id="tform"><span>$</span><input id="tin" name="search-cmd" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" aria-label="コマンド入力" placeholder="help"></form>
    <div class="chips" id="tchips"></div></div>`},
   {id:'site',name:'utsuro.tv',icon:'web',title:'うつろ放送',w:460,h:320,flush:true,html:`<div class="addr">${icon('web')}<span>https://utsuro.tv/</span></div><div class="site"><div class="body">
     <div class="t">うつろ放送</div><p>毎夜、三時三十三分。うつろの部屋をお見せします。</p><p>部屋に誰かが映ったら、その方は招かれます。</p>
@@ -1010,7 +1016,9 @@ function stepHTML(c,st,i){
   const n=`<div class="num">${stepLabel(c,st,i)}</div>`;
   if(stepDone(c,i))return `<div class="done-step" data-k="${c.id}-${i}">${n}${st.q}<br><b>✓ ${esc(S.done[c.id+'-'+i])}</b></div>`;
   let body='';
-  if(st.type==='text')body=`<form class="ans" data-s="${i}"><input type="text" id="in-${c.id}-${i}" autocomplete="off" aria-label="回答" placeholder="答えを入力"><button class="btn" type="submit">回答する</button></form>`;
+  // 入力欄はどれも自動入力・自動修正を切る。iPhone の Safari は autocomplete="off" を無視してパスワードや連絡先を出すことがあり、
+  // 名前に search を含む欄には出さないので name を search-… にしている（端末・地図の入力欄も同じ）
+  if(st.type==='text')body=`<form class="ans" data-s="${i}"><input type="text" id="in-${c.id}-${i}" name="search-answer" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" aria-label="回答" placeholder="答えを入力"><button class="btn" type="submit">回答する</button></form>`;
   if(st.type==='choice')body=`<form data-s="${i}"><div class="opts">${st.options.map((o,j)=>`<label for="in-${c.id}-${i}-${j}"><input type="radio" name="r-${c.id}-${i}" id="in-${c.id}-${i}-${j}" value="${j}">${o}</label>`).join('')}</div><button class="btn" type="submit">${st.tag?.startsWith('対決')?'突きつける':'回答する'}</button></form>`;
   if(st.type==='multi')body=`<form data-s="${i}"><div class="opts">${st.options.map((o,j)=>`<label for="in-${c.id}-${i}-${j}"><input type="checkbox" id="in-${c.id}-${i}-${j}" value="${j}">${o}</label>`).join('')}</div><button class="btn" type="submit">回答する</button></form>`;
   return `<div class="task">${n}<div class="q">${st.q}</div>${body}<div class="feedback" id="fb-${i}"></div></div>`;
@@ -1121,11 +1129,13 @@ function makeDraggable(el){
   const tb=el.querySelector('.tb');
   tb.addEventListener('pointerdown',e=>{
     if(e.target.closest('button')||media('(max-width:760px)'))return;
-    const d=$('desk'),dx=e.clientX-el.offsetLeft,dy=e.clientY-el.offsetTop;
+    // 大きい画面では UI を zoom で拡大しているので、マウスの移動量（画面の px）を拡大率で割って CSS の px に直す
+    const d=$('desk'),z=el.getBoundingClientRect().width/el.offsetWidth||1;
+    const sx=e.clientX,sy=e.clientY,l0=el.offsetLeft,t0=el.offsetTop;
     tb.setPointerCapture(e.pointerId);
     const move=ev=>{
-      el.style.left=Math.max(80-el.offsetWidth,Math.min(ev.clientX-dx,d.clientWidth-80))+'px';
-      el.style.top=Math.max(0,Math.min(ev.clientY-dy,d.clientHeight-34))+'px';};
+      el.style.left=Math.max(80-el.offsetWidth,Math.min(l0+(ev.clientX-sx)/z,d.clientWidth-80))+'px';
+      el.style.top=Math.max(0,Math.min(t0+(ev.clientY-sy)/z,d.clientHeight-34))+'px';};
     const up=()=>{tb.removeEventListener('pointermove',move);tb.removeEventListener('pointerup',up)};
     tb.addEventListener('pointermove',move);tb.addEventListener('pointerup',up);
   });
