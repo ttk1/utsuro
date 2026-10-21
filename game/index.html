@@ -3,7 +3,7 @@
 <meta charset="utf-8">
 <!-- 外から読むのは Google Fonts だけ。GitHub Pages ではヘッダーを付けられないので meta で指定する -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'none'; base-uri 'none'; form-action 'none'">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,interactive-widget=resizes-content">
 <title>無人放送</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700;800&family=Zen+Kaku+Gothic+New:wght@400;700&family=IBM+Plex+Mono:wght@400;500&family=DotGothic16&display=swap">
@@ -20,6 +20,8 @@
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 html,body{margin:0;height:100%;background:#000}
+/* 語りを続けてタップしたときに、iPhone がダブルタップと見なして画面を拡大しないようにする（ピンチでの拡大はできる） */
+html{touch-action:manipulation}
 body{font-family:var(--f-ui);font-size:14px;line-height:1.7;overflow:hidden}
 button{font:inherit}
 button:focus-visible,input:focus-visible,select:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
@@ -281,20 +283,45 @@ tr.pick:hover td{background:var(--surface2)}
   @keyframes flick{0%,96%,100%{opacity:1}97%{opacity:.75}98%{opacity:1}99%{opacity:.85}}
 }
 @media (prefers-reduced-motion:reduce){#narr .more,.toast,.bubble.typing i,.done-step.just,.solved{animation:none}#enh .stream svg{transition:none}}
-/* 狭い画面: ウィンドウは一枚ずつ全面に開く */
+/* 狭い画面: アイコン・ウィンドウ・語りを縦に並べ、ウィンドウは一枚ずつ残りの高さいっぱいに開く。
+   語りの高さは文の長さで変わるので、決め打ちせず縦並びにして重ならないようにしている */
 @media (max-width:760px){
-  #icons{left:0;right:0;top:0;bottom:auto;height:82px;padding:6px 8px;flex-wrap:nowrap;flex-direction:row;overflow-x:auto;gap:2px}
-  #icons button{flex:none;width:72px;padding:4px 2px}
+  #desk{display:flex;flex-direction:column}
+  #icons{position:relative;inset:auto;flex:none;height:82px;padding:6px 8px;flex-wrap:nowrap;flex-direction:row;overflow-x:auto;gap:2px}
+  /* 6 個までなら横にスクロールせず一列に収める。ラベルは文字の途中で折り返さない */
+  #icons button{flex:1 0 56px;width:auto;max-width:80px;padding:4px 2px;font-size:11px}
+  #icons .lb{word-break:keep-all}
   #icons .tile{width:38px;height:38px;font-size:20px}
-  .win{left:0!important;top:82px!important;width:100%!important;height:calc(100% - 82px)!important;border-radius:0;border-width:1px 0 0;resize:none}
-  #desk.nr-on .win{height:calc(100% - 82px - 162px)!important}
+  #wins{position:relative;flex:1;min-height:0}
+  .win{left:0!important;top:0!important;width:100%!important;height:100%!important;min-height:0;border-radius:0;border-width:1px 0 0;resize:none}
   .win .tb{cursor:default}
-  .toast{top:90px;bottom:auto}
-  #narr{bottom:8px;width:calc(100% - 16px);padding:10px 12px 8px}
+  /* アイコンの列やウィンドウの×ボタンをふさがないよう、タイトルバーの下に出す */
+  .toast{top:132px;bottom:auto}
+  #narr{position:relative;left:auto;bottom:auto;transform:none;flex:none;width:auto;margin:0 8px 8px;padding:10px 12px 8px}
   #narr .txt{font-size:15px;min-height:3.4em}
-  #bar #menuBtn{font-size:0;gap:0}
-  #bar #menuBtn .ic{font-size:18px}
+  /* 文字を入力している間はキーボードで狭くなるので語りをしまう（typing は JS で付け外しする） */
+  #desk.typing #narr{display:none}
+  /* タスクバーのボタンはアイコンだけにする（題名を出すと切れて読めないため） */
+  #bar #menuBtn,#bar .apps button{font-size:0;gap:0}
+  #bar #menuBtn .ic,#bar .apps .ic{font-size:18px}
   #bar .clock{font-size:11px}
+  /* 表は横にはみ出すと右の列（手がかりのことがある）に気づけないので、折り返して幅に収める */
+  th,td{padding:6px 6px;white-space:normal}
+  td.m{white-space:nowrap}
+  /* 地図は縮めると文字が読めないので、元に近い大きさのまま横にスクロールさせる */
+  .mapview{overflow-x:auto}
+  .mapview svg{min-width:620px}
+}
+/* タッチ操作: 指で押せる大きさにする。入力欄は 16px 未満だと iPhone がタップのたびに画面を拡大してしまう */
+@media (pointer:coarse){
+  .win .tb{height:44px}
+  .win .wb{width:44px;height:40px;font-size:20px}
+  #narr .ctl button{padding:5px 14px}
+  .term input,.mapbar input,.ans input[type=text]{font-size:16px}
+  .term .chips button{font-size:12.5px;padding:7px 10px}
+  .btn.sm{padding:9px 14px}
+  .results button{padding:11px 12px}
+  .slider input{height:32px}
 }
 </style>
 
@@ -470,12 +497,15 @@ function initMap(){
     const res=MAP.q?PLACES.filter(p=>kata(p.name+p.kind+p.addr).includes(kata(MAP.q))):[];
     const R=document.getElementById('mres');
     R.innerHTML=MAP.q?(res.length?res.map(p=>`<button type="button" data-p="${p.id}">${p.name}<span>${p.kind}</span></button>`).join(''):`<button type="button" disabled>「${esc(MAP.q)}」に一致する場所はありません<span></span></button>`):'';
-    host.querySelectorAll('[data-p]').forEach(el=>{const go=()=>{MAP.sel=el.dataset.p;draw()};el.onclick=go;el.onkeydown=e=>{if(e.key==='Enter')go()}});
+    // 選んだ場所の詳細は地図の下に出るので、画面の外なら見える位置までスクロールする
+    host.querySelectorAll('[data-p]').forEach(el=>{const go=()=>{MAP.sel=el.dataset.p;draw();document.getElementById('pcard').scrollIntoView?.({block:'nearest'})};el.onclick=go;el.onkeydown=e=>{if(e.key==='Enter')go()}});
   };
   const inp=document.getElementById('mq'); inp.value=MAP.q;
   inp.oninput=()=>{MAP.q=inp.value.trim();draw()};
   const rl=document.getElementById('mrail'); rl.checked=MAP.rails; rl.onchange=()=>{MAP.rails=rl.checked;draw()};
   draw();
+  // 狭い画面で横スクロールになるときは、調べる場所が集まっている中央から見せる
+  const mv=document.getElementById('mapview');mv.scrollLeft=(mv.scrollWidth-mv.clientWidth)/2;
 }
 
 // ===== ハッシュ比較 =====
@@ -1066,6 +1096,8 @@ function appsOf(c){return [...(c.chat?[chatApp(c)]:[]),...c.apps,NOTE]}
 function openApp(id){
   if(WIN[id]){WIN[id].hidden=false;focusWin(id);renderTasks();return}
   const a=appsOf(CH[S.cur]).find(x=>x.id===id); if(!a)return;
+  // 狭い画面では通知がウィンドウの中身に重なるので、ウィンドウを開いたら消す（アイコンの未読の印は残る）
+  if(media('(max-width:760px)'))document.querySelectorAll('.toast').forEach(t=>t.remove());
   const d=$('desk'),dw=d.clientWidth||1024,dh=d.clientHeight||700;
   const w=Math.min(a.w,dw-16),h=Math.min(a.h,dh-16),n=cascade++%6;
   const x=a.right?dw-w-16:110+n*30,y=a.right?12:14+n*26;
@@ -1112,7 +1144,7 @@ function renderTasks(){
 // ===== 語り =====
 let NR={lines:[],i:0,timer:null,typing:false,key:null};
 function narrate(lines,start=0,key=null){NR={...NR,lines,i:Math.min(start,lines.length-1),key};showNarr(true);showLine()}
-function showNarr(on){$('narr').hidden=!on;$('narrBtn').hidden=on;$('desk').classList.toggle('nr-on',on)}
+function showNarr(on){$('narr').hidden=!on;$('narrBtn').hidden=on}
 function showLine(){
   const box=$('narr'),[who,text,kind]=NR.lines[NR.i],last=NR.i===NR.lines.length-1;
   box.innerHTML=`<div class="who ${kind||''}">${kind==='frame'?'2036 ・ ミオ':who}</div><div class="txt ${kind||''}"></div>
@@ -1229,6 +1261,15 @@ document.addEventListener('keydown',e=>{
   if((e.key==='Enter'||e.key===' ')&&e.target===document.body&&!$('narr').hidden){e.preventDefault();advance()}
 });
 document.addEventListener('pointerdown',e=>{if(!$('menu').hidden&&!e.target.closest('#menu,#menuBtn'))toggleMenu(false)});
+// 入力中は語りをしまう（狭い画面のみ CSS で効く）。下側だけが動くので入力欄は指の下からずれない。
+// 戻すのを遅らせるのは、入力欄の外（「回答する」や×）をタップしたとき、先にレイアウトが動いて別の場所を押したことにならないようにするため
+let typingTimer;
+document.addEventListener('focusin',e=>{if(e.target.matches('.win input:is([type=text],:not([type]))')){clearTimeout(typingTimer);$('desk').classList.add('typing')}});
+document.addEventListener('focusout',()=>{
+  typingTimer=setTimeout(()=>$('desk').classList.remove('typing'),300);
+  // iPhone はキーボードを出すとページ全体をずらし、閉じても戻さないことがある。ずれたままだとタップ位置が合わなくなるので戻す
+  if(window.scrollY)window.scrollTo(0,0);
+});
 if(!unlocked(S.cur))S.cur=0;
 showTitle();
 </script>
