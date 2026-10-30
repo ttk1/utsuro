@@ -43,6 +43,14 @@ button:focus-visible,input:focus-visible,select:focus-visible,[tabindex]:focus-v
   --wall:linear-gradient(165deg,#d5dde4 0%,#aebac6 100%);
   color-scheme:light;
 }
+/* 2036年のミオの古いノートPC（第二話）。透に見つかる前から使っている一台なので、事務所の端末とは別の暗いテーマにする */
+#screen.mio{
+  --win:#1c2022; --tb:#262b2e; --tb-on:#2f3539; --bg:#111416; --surface:#1c2022; --surface2:#262b2e; --line:#353c40;
+  --fg:#e2e6e8; --muted:#939ba1; --accent:#79bfae; --accent-dim:#2f5a52; --red:#e8777b; --ok:#94c79c; --ok-bg:#142019; --task-bg:#132020;
+  --focus:#5b8def; --bar:rgba(9,11,12,.94); --bar-fg:#cfd4d6; --icon-fg:#e9edef;
+  --wall:radial-gradient(1000px 700px at 30% 30%,#18292a 0%,#0b1112 60%,#050708 100%);
+  color-scheme:dark;
+}
 #desk{position:relative;overflow:hidden;background:var(--wall)}
 #wall{position:absolute;inset:0;pointer-events:none}
 #wall svg{width:100%;height:100%;display:block}
@@ -53,7 +61,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,[tabindex]:focus-v
 #icons button{width:84px;display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 2px;background:transparent;border:1px solid transparent;border-radius:6px;color:var(--icon-fg);cursor:pointer;font-size:12px;line-height:1.35}
 #icons button:hover{background:rgba(127,140,170,.16);border-color:rgba(127,140,170,.25)}
 #icons .tile{width:44px;height:44px;border-radius:11px;display:grid;place-items:center;color:#fff;font-size:24px;box-shadow:0 2px 6px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.25)}
-.y2026 #icons span.lb{text-shadow:0 1px 3px #000}
+.y2026 #icons span.lb,.mio #icons span.lb{text-shadow:0 1px 3px #000}
 .t-chat{background:linear-gradient(#3fb37f,#23875c)} .t-web{background:linear-gradient(#5b8def,#3561c2)} .t-map{background:linear-gradient(#e0a64a,#b67718)}
 .t-term{background:linear-gradient(#3a3d45,#1c1e22)} .t-rec{background:linear-gradient(#d65a5f,#a3343a)} .t-wave{background:linear-gradient(#8b6fd6,#5f45a8)}
 .t-sheet{background:linear-gradient(#45a3a3,#2a7676)} .t-note{background:linear-gradient(#f0cf6a,#c99a22);color:#3b2d06} .t-doc{background:linear-gradient(#9aa3b5,#6b7487)}
@@ -61,7 +69,9 @@ button:focus-visible,input:focus-visible,select:focus-visible,[tabindex]:focus-v
 .t-lock{background:linear-gradient(#59606e,#323844)} .t-news{background:linear-gradient(#d0d4dc,#9aa1ae);color:#1f2329} .t-image{background:linear-gradient(#7fae5d,#557f37)}
 
 /* ===== ウィンドウ ===== */
-.win{position:absolute;display:flex;flex-direction:column;background:var(--win);border:1px solid var(--line);border-radius:8px;box-shadow:0 18px 50px rgba(0,0,0,.45),0 2px 8px rgba(0,0,0,.25);overflow:hidden;resize:both;min-width:260px;min-height:160px}
+.win{position:absolute;display:flex;flex-direction:column;background:var(--win);border:1px solid var(--line);border-radius:8px;box-shadow:0 18px 50px rgba(0,0,0,.45),0 2px 8px rgba(0,0,0,.25);overflow:hidden;min-width:260px;min-height:160px}
+/* 右下のつまみで大きさを変える。CSS の resize は zoom で拡大した画面でポインタより大きく動くので、JS で拡大率を割って動かす */
+.win .rz{position:absolute;right:0;bottom:0;width:18px;height:18px;cursor:nwse-resize;touch-action:none;z-index:1;background:linear-gradient(135deg,transparent 0 55%,var(--line) 55% 62%,transparent 62% 72%,var(--line) 72% 79%,transparent 79%)}
 .win[hidden]{display:none}
 .win .tb{flex:none;display:flex;align-items:center;gap:6px;height:34px;padding:0 4px 0 12px;background:var(--tb);border-bottom:1px solid var(--line);cursor:grab;user-select:none;touch-action:none}
 .win.on .tb{background:var(--tb-on)}
@@ -121,6 +131,10 @@ button:focus-visible,input:focus-visible,select:focus-visible,[tabindex]:focus-v
 #title p{margin:0;color:#a9abb3;font-family:var(--f-display)}
 #title .go{margin-top:18px;background:transparent;color:#e9e7e0;border:1px solid #6b6e78;border-radius:3px;padding:10px 34px;font-size:15px;letter-spacing:.2em;cursor:pointer;font-family:var(--f-display)}
 #title .go:hover{border-color:#e5a13f;color:#e5a13f}
+#title .eps{display:flex;flex-wrap:wrap;justify-content:center;gap:12px}
+#title .eps .go{margin-top:12px;min-width:220px}
+#title .go small{display:block;font-size:11px;letter-spacing:.12em;color:#8e919b;margin-top:2px}
+#title .tip{font-size:12px;color:#7d808a;font-family:var(--f-ui)}
 #title .note{position:absolute;bottom:18px;left:0;right:0;font-size:11.5px;color:#6f727c;font-family:var(--f-ui)}
 #title::after,#card::after{content:"";position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(255,255,255,.03) 0 1px,transparent 1px 3px)}
 #card{cursor:pointer;transition:opacity .6s}
@@ -142,6 +156,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,[tabindex]:focus-v
 .ending .teaser .t{font-size:22px;font-weight:800;letter-spacing:.1em}
 .ending .mono{font-family:var(--f-mono)}
 .ending .cap{font-size:12.5px;color:#7d808a;font-family:var(--f-ui)}
+.ending .endbtns{display:flex;flex-wrap:wrap;gap:10px}
+.ending .back.go2{border-color:#8fa4c9;color:#c3cfe6}
 .ending .back{align-self:flex-start;background:transparent;color:#e9e7e0;border:1px solid #6b6e78;padding:8px 22px;cursor:pointer;font-family:var(--f-display);letter-spacing:.1em}
 
 /* ===== アプリの中身 ===== */
@@ -157,7 +173,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,[tabindex]:focus-v
 .doc .meta{font-size:12px;color:#6a6f80;margin-bottom:4px}
 .doc h4{margin:0 0 6px;font-size:16px}
 .doc.draft{background:#e9e5d6;border-left:4px solid #b39a5a}
-.tablewrap{overflow-x:auto}
+/* 中身がウィンドウより長いとき、横スクロールを持つ表や切り替えボタンが縦に潰れないようにする */
+.tablewrap{overflow-x:auto;flex-shrink:0}
 table{border-collapse:collapse;width:100%;font-size:13.5px;font-variant-numeric:tabular-nums}
 th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
 th{color:var(--muted);font-weight:500;font-size:12px;letter-spacing:.05em}
@@ -178,7 +195,7 @@ tr.pick:hover td{background:var(--surface2)}
 .diffbox svg{display:block;width:100%;height:auto}
 .diffbox .top{position:absolute;inset:0}
 .diffbox.diff .top{mix-blend-mode:difference}
-.seg{display:flex;flex-wrap:wrap;border:1px solid var(--line);align-self:flex-start;border-radius:5px;overflow:hidden}
+.seg{flex-shrink:0;display:flex;flex-wrap:wrap;border:1px solid var(--line);align-self:flex-start;border-radius:5px;overflow:hidden}
 .seg button{font-size:13px;background:transparent;color:var(--muted);border:0;padding:6px 14px;cursor:pointer}
 .seg button.on{background:var(--accent);color:#1a1206}
 .site{background:#07080c;color:#cfc9b8}
@@ -274,15 +291,15 @@ tr.pick:hover td{background:var(--surface2)}
 @keyframes ok{0%{background:color-mix(in srgb,var(--ok) 35%,transparent)}100%{background:var(--ok-bg)}}
 .solved{animation:rise .5s ease-out}
 @keyframes rise{from{opacity:0;transform:translateY(6px)}}
-#enh .stream{cursor:zoom-in}
-#enh .stream svg{transition:transform .3s ease}
-#enh.zoom .stream{cursor:zoom-out}
-#enh.zoom .stream svg{transform:scale(2.6)}
+.zoomable .stream{cursor:zoom-in}
+.zoomable .stream svg{transition:transform .3s ease}
+.zoomable.zoom .stream{cursor:zoom-out}
+.zoomable.zoom .stream svg{transform:scale(2.6)}
 @media (prefers-reduced-motion:no-preference){
   .flick{animation:flick 6s infinite}
   @keyframes flick{0%,96%,100%{opacity:1}97%{opacity:.75}98%{opacity:1}99%{opacity:.85}}
 }
-@media (prefers-reduced-motion:reduce){#narr .more,.toast,.bubble.typing i,.done-step.just,.solved{animation:none}#enh .stream svg{transition:none}}
+@media (prefers-reduced-motion:reduce){#narr .more,.toast,.bubble.typing i,.done-step.just,.solved{animation:none}.zoomable .stream svg{transition:none}}
 /* 狭い画面: アイコン・ウィンドウ・語りを縦に並べ、ウィンドウは一枚ずつ残りの高さいっぱいに開く。
    語りの高さは文の長さで変わるので、決め打ちせず縦並びにして重ならないようにしている */
 @media (max-width:760px){
@@ -293,7 +310,8 @@ tr.pick:hover td{background:var(--surface2)}
   #icons .lb{word-break:keep-all}
   #icons .tile{width:38px;height:38px;font-size:20px}
   #wins{position:relative;flex:1;min-height:0}
-  .win{left:0!important;top:0!important;width:100%!important;height:100%!important;min-height:0;border-radius:0;border-width:1px 0 0;resize:none}
+  .win{left:0!important;top:0!important;width:100%!important;height:100%!important;min-height:0;border-radius:0;border-width:1px 0 0}
+  .win .rz{display:none}
   .win .tb{cursor:default}
   /* アイコンの列やウィンドウの×ボタンをふさがないよう、タイトルバーの下に出す */
   .toast{top:132px;bottom:auto}
@@ -351,7 +369,8 @@ tr.pick:hover td{background:var(--surface2)}
   <div class="in">
     <h1>無人<span>放送</span></h1>
     <p>毎夜三時三十三分。誰もいない部屋が、十一分だけ映る。</p>
-    <button type="button" class="go" id="start">はじめる</button>
+    <div class="eps"><button type="button" class="go" id="start"></button><button type="button" class="go" id="start2"></button></div>
+    <div class="tip">第二話は第一話の続きです。第一話から遊んでください。</div>
   </div>
   <div class="note">進行状況はこのブラウザに保存されます。登場する人物・地名・サイトはすべて架空です。</div>
 </div>
@@ -544,16 +563,21 @@ function initBright(){
   const br=document.getElementById('br');
   const f=()=>{const v=+br.value;document.querySelector('#enh svg').style.filter=`brightness(${v}) contrast(${1+(v-1)*.15}) saturate(${1-(v-1)*.1})`;document.getElementById('brv').textContent='×'+v.toFixed(1)};
   br.oninput=f;f();
-  // 映像をクリックすると、その位置を中心に拡大する（もう一度クリックで戻す）
-  const enh=document.getElementById('enh'),svg=enh.querySelector('svg');
-  enh.querySelector('.stream').onclick=e=>{
-    if(!enh.classList.contains('zoom')){const r=svg.getBoundingClientRect();svg.style.transformOrigin=`${(e.clientX-r.left)/r.width*100}% ${(e.clientY-r.top)/r.height*100}%`}
-    enh.classList.toggle('zoom');
+  initZoom(document.getElementById('enh'));
+}
+// 映像をクリックすると、その位置を中心に拡大する（もう一度クリックで戻す）。.zoomable の中の .stream が対象
+function initZoom(box){
+  box=box.classList.contains('zoomable')?box:box.querySelector('.zoomable');
+  const svg=box.querySelector('.stream svg');
+  box.querySelector('.stream').onclick=e=>{
+    if(!box.classList.contains('zoom')){const r=svg.getBoundingClientRect();svg.style.transformOrigin=`${(e.clientX-r.left)/r.width*100}% ${(e.clientY-r.top)/r.height*100}%`}
+    box.classList.toggle('zoom');
   };
 }
 
 // ===== 端末 =====
-const TERM={
+// コマンドは話ごとに持つ（EPS[n].term）。cmds: 入力 → 出力、fallback: cmds にないときの返事、chips: 入力の候補
+const TERM1={
  help:()=>`使えるコマンド:
   history                  遼のPCに残っていたコマンド履歴
   view-source &lt;ドメイン>   ページのソースを表示
@@ -637,12 +661,23 @@ function A(){return `UA-48213077 を使うサイト:
   UA-48213077-1  kuga-housing.jp   「久我ハウジング管理」
   UA-48213077-2  utsuro.tv         「うつろ放送」
 <span class="dim"># 同じ解析アカウントで管理されている。持ち主は同じ。</span>`}
+function term1Fallback(k,raw){
+  if(/^wayback utsuro\.tv 2021\d*$/.test(k))return '日付は8桁で指定してください。一覧は wayback utsuro.tv で確認できます。';
+  if(/^wayback utsuro\.tv \S+/.test(k))return 'その日付の保存版はありません。wayback utsuro.tv で一覧を確認してください。';
+  if(/^wayback kuga-housing\.jp/.test(k))return '保存版は現在のサイトと同じ内容です。';
+  if(/^analytics/.test(k))return '一致するサイトは見つかりませんでした。IDはページのソースにあります。';
+  if(/^curl kuga-housing\.jp\//.test(k))return '404 Not Found。トップページにリンクがあります。';
+  if(/^(whois|curl|view-source|wayback)$/.test(k))return '引数が必要です。例: '+k+' utsuro.tv';
+  if(/^(whois|curl|view-source|wayback) /.test(k))return '応答がありません。ドメイン名を確認してください。';
+  return `command not found: ${esc(raw.split(' ')[0])}`;
+}
 let termLog=null,termHist=[];
 function initTerm(){
+  const T=EPS[EP].term;
   const out=document.getElementById('tout'),f=document.getElementById('tform'),inp=document.getElementById('tin'),chips=document.getElementById('tchips');
-  if(termLog===null)termLog=`<span class="dim">ghostwire OSINT shell ・ help でコマンド一覧</span>\n`;
+  if(termLog===null)termLog=`<span class="dim">${T.banner}</span>\n`;
   out.innerHTML=termLog;out.scrollTop=out.scrollHeight;
-  chips.innerHTML=['help','history','view-source ','whois ','wayback ','analytics ','curl '].map(s=>`<button type="button">${s}</button>`).join('');
+  chips.innerHTML=T.chips.map(s=>`<button type="button">${s}</button>`).join('');
   chips.querySelectorAll('button').forEach(b=>b.onclick=()=>{inp.value=b.textContent;inp.focus()});
   // ↑↓ で打ったコマンドを呼び出す
   let pos=termHist.length;
@@ -656,16 +691,7 @@ function initTerm(){
     if(termHist[termHist.length-1]!==raw)termHist.push(raw);pos=termHist.length;
     const k=raw.normalize('NFKC').replace(/\s+/g,' ').toLowerCase().replace(/https?:\/\//g,'').replace(/^(\S+ \S+?)\/$/,'$1').replace(/www\./,'');
     if(k==='clear'){termLog='';out.innerHTML='';inp.value='';return}
-    let res;
-    if(Object.hasOwn(TERM,k))res=TERM[k]();
-    else if(/^wayback utsuro\.tv 2021\d*$/.test(k)&&k!=='wayback utsuro.tv 20210320')res='日付は8桁で指定してください。一覧は wayback utsuro.tv で確認できます。';
-    else if(/^wayback utsuro\.tv \S+/.test(k))res='その日付の保存版はありません。wayback utsuro.tv で一覧を確認してください。';
-    else if(/^wayback kuga-housing\.jp/.test(k))res='保存版は現在のサイトと同じ内容です。';
-    else if(/^analytics/.test(k))res='一致するサイトは見つかりませんでした。IDはページのソースにあります。';
-    else if(/^curl kuga-housing\.jp\//.test(k))res='404 Not Found。トップページにリンクがあります。';
-    else if(/^(whois|curl|view-source|wayback)$/.test(k))res='引数が必要です。例: '+k+' utsuro.tv';
-    else if(/^(whois|curl|view-source|wayback) /.test(k))res='応答がありません。ドメイン名を確認してください。';
-    else res=`command not found: ${esc(raw.split(' ')[0])}`;
+    const res=Object.hasOwn(T.cmds,k)?T.cmds[k]():T.fallback(k,raw);
     termLog+=`<span class="cmd">$ ${esc(raw)}</span>\n${res}\n\n`;
     out.innerHTML=termLog;out.scrollTop=out.scrollHeight;inp.value='';};
 }
@@ -730,13 +756,21 @@ const WALL={
    <circle cx="1400" cy="200" r="16" fill="none" stroke="#b8740f" stroke-width="2" opacity=".45"/>
   </svg>`;
  })(),
+ // 2036年: ミオの古いノートPC。holly に言われた「癖は消せない」から、点々と続く足跡
+ mio:(()=>{
+  const steps=Array.from({length:16},(_,i)=>{const t=i/15,x=160+t*1280,y=740-Math.sin(t*3)*240-t*140,s=i%2?16:-16,r=-30+t*40;
+   return `<ellipse cx="${x}" cy="${y+s}" rx="10" ry="16" transform="rotate(${r} ${x} ${y+s})"/><circle cx="${x+Math.sin(r*Math.PI/180)*20}" cy="${y+s-Math.cos(r*Math.PI/180)*20}" r="5"/>`}).join('');
+  return `<svg viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice">
+   <g stroke="#8fd0c0" stroke-width="1" opacity=".05">${Array.from({length:17},(_,i)=>`<line x1="${i*100}" y1="0" x2="${i*100}" y2="900"/>`).join('')}${Array.from({length:10},(_,i)=>`<line x1="0" y1="${i*100}" x2="1600" y2="${i*100}"/>`).join('')}</g>
+   <g fill="#8fd0c0" opacity=".1">${steps}</g></svg>`;
+ })(),
 };
 
 // ===== 章データ =====
 // narr: 語り [話し手, 本文, 'frame'＝2036年のミオ]。chat: チャットアプリの会話。apps: デスクトップのアプリ。open: 章の始めに開くアプリ
-const CH=[
+const CH1=[
 {
- id:0,no:'序章',title:'十年後の依頼',theme:'y2036',mark:'SHINOMIYA RESEARCH',clock:'2036/10/20 23:10',where:'篠宮リサーチ 事務所',
+ id:0,no:'序章',title:'十年後の依頼',theme:'y2036',mark:'SHINOMIYA RESEARCH',next:'2026_utsuro を開く',clock:'2036/10/20 23:10',where:'篠宮リサーチ 事務所',
  narr:[[M,'2036年10月。篠宮透が逮捕されて、三日が経った。'],
   [M,'容疑は殺人。被害者はフリーの記者で、透さんの古い知り合いだった。犯行時刻、透さんのスマホは現場にあった。現場の防犯カメラには、透さんによく似た男が映っていた。透さんのアカウントからは、「全部俺がやった」という投稿まで出ている。'],
   [M,'透さんは取り調べで、ひとことも話していないらしい。'],
@@ -744,7 +778,7 @@ const CH=[
   [M,'四年前、私は透さんに見つけられた側の人間だった。ログの消し方なら、その前から知っていた。残し方と読み方を教えてくれたのは、透さんだ。'],
   [M,'逮捕の前の晩、透さんからメッセージが届いていた。'],
   [M,'「ログは嘘をつかない。嘘をつくのは、ログを読む人間だ」。透さんの口癖だ。今回のログは、全部透さんが犯人だと言っている。']],
- chat:{with:'篠宮 透',msgs:[['篠宮 透','2036/10/16 23:48','ミオ．しばらく事務所に戻れない．<br>最初の事件のファイルを読め．全部そこにある．<br>鍵は，俺が最初に名乗った名前．'],['篠宮 透','23:49','架純には連絡するな．'],['me','23:51','どういうことですか？ 透さん？']],tail:'既読はついていない。'},
+ chat:{with:'篠宮 透',quiet:true,msgs:[['篠宮 透','2036/10/16 23:48','ミオ．しばらく事務所に戻れない．<br>最初の事件のファイルを読め．全部そこにある．<br>鍵は，俺が最初に名乗った名前．'],['篠宮 透','23:49','架純には連絡するな．'],['me','23:51','どういうことですか？ 透さん？']],tail:'既読はついていない。'},
  open:[],
  steps:[
   {type:'text',q:'暗号化された事件ファイルのパスワードは？',
@@ -778,7 +812,7 @@ $ open 2026_utsuro.enc
  ]
 },
 {
- id:1,no:'第一章',title:'別れの投稿',theme:'y2026',mark:'',clock:'2026/10/19 01:12',where:'情報工学棟 7階 研究室',
+ id:1,no:'第一章',title:'別れの投稿',theme:'y2026',mark:'',boot:'$ mount 2026_utsuro.img /mnt/case\n  ghostwire-x13 / 2026-10-19 snapshot ... ok\n',clock:'2026/10/19 01:12',where:'情報工学棟 7階 研究室',
  narr:[[M,'「ログは嘘をつかない」。透さんが最初にそれを知ったのは、二十歳のとき、後輩から届いたメッセージがきっかけだったという。','frame'],
   ['','2026年10月19日、月曜日。午前一時を過ぎた情報工学棟の七階には、篠宮透のほかに誰もいなかった。'],
   ['','スマホが震えた。ゼミの一つ下の後輩、水野架純からだった。'],
@@ -938,7 +972,7 @@ $ open 2026_utsuro.enc
    <div class="tablewrap"><table id="htab"><tr><th>配信日</th><th>曜日</th><th>ハッシュ値</th><th>灯籠のメモ</th></tr>
     ${HASH.map((r,i)=>`<tr class="pick" data-h="${i}" tabindex="0"><td class="m">${r[0]}</td><td>${r[1]}</td><td class="m">${r[2]}</td><td>${r[3]}</td></tr>`).join('')}</table></div>
    <div class="cmp" id="hcmp"><span class="verdict">比較する2行を選んでください。</span></div>`},
-  {id:'video',name:'10/11 の録画',icon:'rec',title:'rec_1011_033612.png ― 灯籠の録画',w:580,h:470,init:initBright,html:`<div id="enh">${stream(roomSVG({dark:true,figures:true}),'LIVE うつろ放送','10/11 03:36:12<br>視聴 9')}</div>
+  {id:'video',name:'10/11 の録画',icon:'rec',title:'rec_1011_033612.png ― 灯籠の録画',w:580,h:470,init:initBright,html:`<div id="enh" class="zoomable">${stream(roomSVG({dark:true,figures:true}),'LIVE うつろ放送','10/11 03:36:12<br>視聴 9')}</div>
    <label class="slider" for="br">明るさ補正<input type="range" id="br" min="1" max="8" step="0.1" value="1"><span class="mono" id="brv">×1.0</span></label>
    <div class="cap">灯籠の録画から切り出した1フレーム。映像をクリックすると、その場所を拡大できる。</div>`}
  ]
@@ -995,11 +1029,511 @@ $ open 2026_utsuro.enc
 }
 ];
 
+// ===================== 第二話「不在証明」 =====================
+// ===== 第二話の絵 =====
+// 事務所のうつろ放送。入口の上の角から窓のほうを見下ろす。正しい向きのカメラなので時計は反転しない（3時35分）
+function officeSVG(o={}){
+  const bld=[[150,58,40],[195,80,30],[230,50,45],[280,74,35],[320,40,50],[375,68,40],[420,54,45],[470,84,35],[510,44,50],[565,64,45]];
+  const lit=[[160,70],[240,64],[332,52],[344,70],[430,66],[520,58],[578,78],[248,92]];
+  // 録画の11分間に通ったのは乗用車4台とタクシー1台。トラックは描かない
+  const cars=[[176,0],[262,0],[352,1],[468,0],[560,0]].map(([x,t])=>`<rect x="${x}" y="116" width="15" height="6" rx="2" fill="${t?'rgb(150,128,46)':'rgb(74,78,90)'}"/><circle cx="${x+14}" cy="119" r="1.6" fill="rgb(255,240,200)"/><circle cx="${x+1}" cy="119" r="1.4" fill="rgb(220,60,50)"/>`).join('');
+  return `<svg viewBox="0 0 640 360" role="img" aria-label="うつろ放送の配信画面。夜の事務所">
+  <defs><radialGradient id="ofv" cx="50%" cy="50%" r="70%"><stop offset="60%" stop-color="#000" stop-opacity="0"/><stop offset="100%" stop-color="#000" stop-opacity=".6"/></radialGradient></defs>
+  <rect width="640" height="360" fill="rgb(36,40,50)"/>
+  <rect x="150" y="30" width="460" height="160" fill="rgb(12,16,28)"/>
+  ${bld.map(([x,y,w])=>`<rect x="${x}" y="${y}" width="${w}" height="${190-y}" fill="rgb(22,26,38)"/>`).join('')}
+  ${lit.map(([x,y])=>`<rect x="${x}" y="${y}" width="5" height="4" fill="rgb(120,112,80)"/>`).join('')}
+  <rect x="150" y="107" width="460" height="2" fill="rgb(72,74,86)"/>
+  <rect x="150" y="113" width="460" height="12" fill="rgb(46,48,58)"/>
+  <rect x="150" y="125" width="460" height="3" fill="rgb(28,30,38)"/>
+  ${[190,300,410,520].map(x=>`<rect x="${x}" y="128" width="10" height="62" fill="rgb(32,34,44)"/>`).join('')}
+  ${cars}
+  <rect x="150" y="30" width="460" height="160" fill="none" stroke="rgb(78,80,88)" stroke-width="6"/>
+  <line x1="303" y1="30" x2="303" y2="190" stroke="rgb(78,80,88)" stroke-width="4"/><line x1="456" y1="30" x2="456" y2="190" stroke="rgb(78,80,88)" stroke-width="4"/>
+  <rect x="144" y="188" width="472" height="9" fill="rgb(88,90,96)"/>
+  ${o.flower?`<g><rect x="540" y="176" width="9" height="12" fill="rgb(150,170,180)" opacity=".5"/><path d="M544.5 176 L545 160" stroke="rgb(70,110,70)" stroke-width="1.5"/>
+   <circle cx="545" cy="157" r="5" fill="rgb(232,232,226)"/><circle cx="540" cy="160" r="3.5" fill="rgb(222,222,216)"/><circle cx="550" cy="160" r="3.5" fill="rgb(222,222,216)"/><circle cx="545" cy="153" r="3" fill="rgb(240,240,234)"/></g>`:''}
+  <g transform="translate(78 84)">
+   <circle r="23" fill="rgb(190,186,176)" stroke="rgb(60,58,52)" stroke-width="3"/>
+   <g font-family="IBM Plex Mono, monospace" font-size="9" fill="rgb(40,40,40)" text-anchor="middle"><text y="-12">12</text><text x="15" y="3">3</text><text y="19">6</text><text x="-15" y="3">9</text></g>
+   <line x1="0" y1="0" x2="11" y2="3.5" stroke="rgb(30,30,30)" stroke-width="2.5"/><line x1="0" y1="0" x2="-8" y2="15" stroke="rgb(30,30,30)" stroke-width="2"/>
+  </g>
+  <polygon points="0,215 640,215 640,360 0,360" fill="rgb(50,48,46)"/>
+  ${[0,1,2,3,4,5].map(i=>`<line x1="${i*128}" y1="215" x2="${i*150-60}" y2="360" stroke="rgb(42,40,38)" stroke-width="2"/>`).join('')}
+  <rect x="0" y="210" width="640" height="5" fill="rgb(30,30,34)"/>
+  <rect x="226" y="176" width="70" height="40" rx="2" fill="rgb(18,20,24)" stroke="rgb(60,62,68)" stroke-width="2"/><rect x="256" y="216" width="10" height="8" fill="rgb(50,52,56)"/>
+  <polygon points="160,224 352,224 364,250 148,250" fill="rgb(96,84,70)"/><rect x="148" y="250" width="216" height="34" fill="rgb(70,60,50)"/>
+  <rect x="236" y="230" width="44" height="9" rx="1" fill="rgb(40,40,44)"/>
+  <rect x="474" y="156" width="52" height="60" rx="8" fill="rgb(28,28,32)"/>
+  <polygon points="396,216 590,216 600,240 386,240" fill="rgb(96,84,70)"/><rect x="386" y="240" width="214" height="34" fill="rgb(70,60,50)"/>
+  ${o.phone?`<g transform="rotate(-8 432 226)"><rect x="424" y="221" width="16" height="9" rx="1.5" fill="rgb(16,18,22)"/><rect x="426" y="222.5" width="12" height="6" rx="1" fill="rgb(34,42,56)"/></g>`:''}
+  <rect x="20" y="268" width="90" height="70" fill="rgb(44,44,48)"/><rect x="20" y="268" width="90" height="4" fill="rgb(60,60,66)"/>
+  <rect width="640" height="360" fill="url(#ofv)"/>
+ </svg>`;
+}
+// 事務所の見取り図。カメラがありそうな場所を A〜D で示す
+function planSVG(){
+  const pt=(x,y,l)=>`<g><circle cx="${x}" cy="${y}" r="11" fill="#e5a13f"/><text x="${x}" y="${y+4}" text-anchor="middle" font-size="12" font-weight="700" fill="#1a1206">${l}</text></g>`;
+  return `<svg viewBox="0 0 640 380" role="img" aria-label="事務所の見取り図" style="background:#f4f3f0">
+  <g font-family="Zen Kaku Gothic New, sans-serif" font-size="13" fill="#4a4f59">
+   <rect x="40" y="40" width="560" height="300" fill="#fff" stroke="#3d424c" stroke-width="4"/>
+   <rect x="120" y="34" width="400" height="12" fill="#bcd3e8" stroke="#3d424c" stroke-width="2"/><text x="320" y="26" text-anchor="middle">窓（首都高の高架が見える）</text>
+   <rect x="150" y="70" width="150" height="50" fill="#e8dfd2" stroke="#8a7e6c"/><text x="225" y="100" text-anchor="middle">私の机</text>
+   <rect x="380" y="70" width="150" height="50" fill="#e8dfd2" stroke="#8a7e6c"/><text x="455" y="100" text-anchor="middle">透さんの机</text>
+   <rect x="440" y="50" width="30" height="18" rx="4" fill="#9aa1ae"/>
+   <rect x="470" y="250" width="130" height="90" fill="#eef1f4" stroke="#3d424c" stroke-width="2"/><text x="535" y="300" text-anchor="middle">給湯室</text>
+   <rect x="40" y="290" width="70" height="50" fill="none"/><line x1="44" y1="338" x2="104" y2="338" stroke="#fff" stroke-width="6"/><path d="M44 338 A60 60 0 0 1 104 278" fill="none" stroke="#8a8f99" stroke-dasharray="4 3"/><text x="74" y="364" text-anchor="middle">入口</text>
+  </g>
+  ${pt(588,52,'A')}${pt(52,328,'B')}${pt(540,282,'C')}${pt(455,135,'D')}
+  <text x="320" y="374" text-anchor="middle" font-size="11" fill="#666a74" font-family="Zen Kaku Gothic New, sans-serif">天井の高さは約2.6m。A・B は天井の角</text>
+ </svg>`;
+}
+// 柊さんの定点カメラ。ランドリーの看板の上から、通りの向こうの跡地（駐車場）を北向きに見下ろす。東は右
+function lotSVG(o={}){
+  const top=x=>70+x*52,bot=x=>10+x*68;
+  return `<svg viewBox="0 0 640 360" role="img" aria-label="跡地の駐車場を映す定点カメラの映像">
+  <defs><radialGradient id="ltl" cx="88%" cy="20%" r="40%"><stop offset="0%" stop-color="rgb(120,110,80)" stop-opacity=".35"/><stop offset="100%" stop-color="#000" stop-opacity="0"/></radialGradient></defs>
+  <rect width="640" height="360" fill="rgb(14,16,24)"/>
+  ${[[0,50,90],[95,36,110],[210,60,80],[295,44,120],[420,58,90],[515,40,125]].map(([x,y,w])=>`<rect x="${x}" y="${y}" width="${w}" height="${118-y}" fill="rgb(24,26,32)"/>`).join('')}
+  <rect x="130" y="62" width="6" height="5" fill="rgb(110,100,70)"/><rect x="470" y="74" width="6" height="5" fill="rgb(110,100,70)"/>
+  <rect x="0" y="110" width="640" height="8" fill="rgb(40,40,46)"/>
+  <polygon points="40,118 600,118 640,262 0,262" fill="rgb(50,50,55)"/>
+  ${Array.from({length:11},(_,i)=>`<line x1="${top(i)}" y1="128" x2="${bot(i)}" y2="252" stroke="rgb(140,140,138)" stroke-width="2"/>`).join('')}
+  ${Array.from({length:10},(_,i)=>`<rect x="${top(i)+14}" y="124" width="24" height="5" fill="rgb(96,96,96)"/>`).join('')}
+  ${[2,5].map(i=>`<g><rect x="${(top(i)+bot(i))/2+6}" y="150" width="46" height="70" rx="10" fill="rgb(34,36,42)"/><rect x="${(top(i)+bot(i))/2+12}" y="164" width="34" height="18" rx="4" fill="rgb(24,26,30)"/></g>`).join('')}
+  <path d="M44 120 l4 -12 l3 12 M54 121 l5 -10 l2 11 M64 122 l3 -9 l3 9" stroke="rgb(60,86,58)" stroke-width="2" fill="none"/>
+  <rect x="0" y="262" width="640" height="98" fill="rgb(32,32,36)"/><rect x="0" y="262" width="640" height="4" fill="rgb(70,70,74)"/>
+  ${[0,1,2,3,4,5,6,7].map(i=>`<rect x="${i*90+20}" y="318" width="44" height="4" fill="rgb(120,118,96)"/>`).join('')}
+  ${o.flower?`<g><path d="M567 128 l1 -7" stroke="rgb(70,110,70)" stroke-width="1.2"/><circle cx="568" cy="120" r="3" fill="rgb(236,236,230)"/><circle cx="565" cy="122" r="2" fill="rgb(226,226,220)"/></g>`:''}
+  ${o.figure?`<g><path d="M575 168 Q560 166 556 150 Q556 134 572 130 Q590 128 594 146 Q596 164 585 170 Z" fill="rgb(108,110,114)"/><ellipse cx="575" cy="126" rx="9" ry="10" fill="rgb(46,42,40)"/><rect x="560" y="166" width="12" height="8" fill="rgb(30,30,34)"/><rect x="580" y="166" width="12" height="8" fill="rgb(30,30,34)"/></g>`:''}
+  <rect width="640" height="360" fill="url(#ltl)"/>
+ </svg>`;
+}
+// 週刊誌に載った防犯カメラの写真。背景のマンションは工事の足場とシートに覆われている
+function photoSVG(){
+  return `<svg viewBox="0 0 640 360" role="img" aria-label="防犯カメラの映像。街灯の下を歩く灰色のコートの男。背景のマンションに工事の足場">
+  <defs><radialGradient id="pgl" cx="40%" cy="14%" r="45%"><stop offset="0%" stop-color="rgb(170,160,120)" stop-opacity=".45"/><stop offset="100%" stop-color="#000" stop-opacity="0"/></radialGradient></defs>
+  <rect width="640" height="360" fill="rgb(12,14,20)"/>
+  <rect x="330" y="30" width="310" height="232" fill="rgb(44,44,48)"/>
+  ${Array.from({length:10},(_,i)=>`<line x1="${334+i*34}" y1="26" x2="${334+i*34}" y2="262" stroke="rgb(96,96,92)" stroke-width="2"/>`).join('')}
+  ${Array.from({length:6},(_,i)=>`<line x1="330" y1="${40+i*44}" x2="640" y2="${40+i*44}" stroke="rgb(96,96,92)" stroke-width="2"/>`).join('')}
+  <rect x="330" y="30" width="310" height="232" fill="rgb(176,178,172)" opacity=".38"/>
+  <rect x="392" y="122" width="52" height="40" fill="rgb(38,38,42)" opacity=".9"/>
+  <text x="448" y="152" font-family="Zen Kaku Gothic New, sans-serif" font-weight="700" font-size="25" fill="rgb(44,62,108)">木工務店</text>
+  <text x="448" y="180" font-family="IBM Plex Mono, monospace" font-size="13" fill="rgb(44,62,108)">TEL 03-****-4721</text>
+  <rect x="0" y="150" width="200" height="112" fill="rgb(26,28,32)"/><rect x="0" y="146" width="200" height="6" fill="rgb(44,44,48)"/>
+  <polygon points="0,262 640,262 640,360 0,360" fill="rgb(30,30,32)"/><rect x="0" y="258" width="640" height="6" fill="rgb(58,58,60)"/>
+  <rect x="246" y="40" width="6" height="222" fill="rgb(60,60,64)"/><rect x="236" y="36" width="26" height="8" rx="3" fill="rgb(200,190,150)"/>
+  <rect x="226" y="150" width="46" height="18" fill="rgb(200,200,196)"/><text x="249" y="163" text-anchor="middle" font-family="Zen Kaku Gothic New, sans-serif" font-size="8" fill="rgb(40,40,40)">柚木台三丁目 7</text>
+  <g><ellipse cx="318" cy="168" rx="10" ry="12" fill="rgb(52,48,44)"/><path d="M303 182 Q318 174 333 182 L338 248 L298 248 Z" fill="rgb(112,114,118)"/><rect x="304" y="246" width="11" height="18" fill="rgb(26,26,30)"/><rect x="322" y="246" width="11" height="18" fill="rgb(26,26,30)"/></g>
+  <rect width="640" height="360" fill="url(#pgl)"/>
+ </svg>`;
+}
+// 来客用の回線を通ったデータ量（1分ごと、03:30〜05:30）。動きがあるとカメラの送る量が増える
+const NETDAY={'10/10':[],'10/11':[[22,27,980],[104,106,760]],'10/12':[]};
+const netData=day=>Array.from({length:121},(_,i)=>{const sp=NETDAY[day].find(([a,b])=>i>=a&&i<=b);return sp?sp[2]+((i*53)%9)*14:16+((i*37)%11)});
+const netTime=i=>{const m=210+i;return `0${Math.floor(m/60)}:${String(m%60).padStart(2,'0')}`};
+function netSVG(day){
+  const d=netData(day),bw=600/121;
+  return `<svg viewBox="0 0 640 200" role="img" aria-label="${day} 03:30〜05:30 の送信量">
+  <rect width="640" height="200" fill="#0b0c10"/>
+  ${[0,30,60,90,120].map(i=>`<line x1="${30+i*bw}" y1="10" x2="${30+i*bw}" y2="170" stroke="#2c2f37"/><text x="${30+i*bw}" y="188" text-anchor="middle" font-size="11" fill="#8b91aa" font-family="IBM Plex Mono, monospace">${netTime(i)}</text>`).join('')}
+  ${d.map((v,i)=>`<rect x="${30+i*bw}" y="${170-v/1200*160}" width="${bw-.6}" height="${v/1200*160}" fill="${v>300?'#e5a13f':'#3b4566'}"/>`).join('')}
+ </svg>`;
+}
+function initNet(el){
+  const box=el.querySelector('#netbox'),cap=el.querySelector('#netcap');let day='10/10';
+  const draw=()=>{box.innerHTML=netSVG(day);cap.textContent=`${day} の夜。グラフをタップすると、その時刻の送信量が出る。`;
+   box.querySelector('svg').onclick=e=>{const r=e.currentTarget.getBoundingClientRect(),i=Math.max(0,Math.min(120,Math.round(((e.clientX-r.left)/r.width*640-30)/(600/121))));cap.textContent=`${day} ${netTime(i)} ・ ${netData(day)[i]} KB/分`}};
+  el.querySelectorAll('[data-day]').forEach(b=>b.onclick=()=>{day=b.dataset.day;el.querySelectorAll('[data-day]').forEach(x=>x.classList.toggle('on',x===b));draw()});
+  draw();
+}
+// Web 検索（第四章）。語をすべて含む結果を出す
+const SRCH=[
+ {t:'高木工務店 ｜ 施工中の現場',u:'takagi-koumuten.example/works',b:'外壁改修工事　ハイム柚木台（柚木台三丁目）　工期：8月4日〜9月30日<br>屋根の葺き替え　柚木台一丁目　工期：10月6日〜10月24日',k:'木工務店 工務店 4721 足場 工期 柚木台'},
+ {t:'高木工務店 ｜ 会社案内',u:'takagi-koumuten.example',b:'柚木台の地域密着の工務店です。外壁・屋根・リフォーム。TEL 03-5577-4721',k:'木工務店 工務店 4721'},
+ {t:'並木工務店',u:'namiki-k.example',b:'外構・リフォームのご相談はお気軽に。TEL 03-3409-1189',k:'木工務店 工務店'},
+ {t:'ゆずの木 @yuzunoki_3 ・ 9月16日 8:40',u:'tsubuyaki.example/yuzunoki_3',b:'向かいのマンション、足場とシートで朝から真っ暗。早く終わってほしい。',k:'足場 マンション 柚木台'},
+ {t:'ゆずの木 @yuzunoki_3 ・ 10月1日 12:08',u:'tsubuyaki.example/yuzunoki_3',b:'向かいのハイム柚木台の足場、やっと取れた。二か月ぶりに空が広い。<br>［写真：足場のない白い壁のマンション。手前の電柱に「柚木台三丁目 7」］',k:'足場 ハイム柚木台 マンション 柚木台'},
+ {t:'kei_t @kei_tt ・ 10月12日 7:15',u:'tsubuyaki.example/kei_tt',b:'柚木台でパトカーがすごい。何があったんだろう。',k:'柚木台 事件'},
+ {t:'柚木台パークハウス 入居者のみなさまへ（防犯カメラについて）',u:'yunokidai-park.example/info',b:'エントランスと周辺の防犯カメラは、東都セキュリティと契約しています。映像は同社のサーバーに<b>30日間</b>保存され、その後自動で消去されます。',k:'防犯カメラ 警備会社 保存 保存期間 パークハウス 柚木台 マンション'},
+];
+function initSearch(el){
+  const inp=el.querySelector('#sq'),out=el.querySelector('#sres');
+  const run=()=>{const q=inp.value.trim();if(!q){out.innerHTML='<div class="cap">語を空白で区切ると、すべてを含む結果だけが出ます。</div>';return}
+   const ws=q.split(/\s+/).map(kata),hit=SRCH.filter(r=>ws.every(w=>kata(r.t+r.b+r.k+r.u).includes(w)));
+   out.innerHTML=hit.length?hit.map(r=>`<div class="doc"><div class="meta">${r.u}</div><h4>${r.t}</h4>${r.b}</div>`).join(''):`<div class="cap">「${esc(q)}」に一致する結果はありません。</div>`};
+  el.querySelector('form').onsubmit=e=>{e.preventDefault();run()};run();
+}
+const md=(m,d)=>new RegExp(`^(0?${m}[/\\-月.]0?${d}日?|0?${m}${String(d).padStart(2,'0')})$`);
+
+// ===== 第二話の端末（ミオの古いノートPC） =====
+const TERM2={
+ help:()=>`使えるコマンド:
+  whois &lt;ドメイン>   ドメインの登録情報
+  curl &lt;URL>        ページの本文を取得
+  trace &lt;URL>       映像が届くまでの経路をたどる
+  clear             画面を消す`,
+ 'whois utsuro.tv':()=>`Domain Name: UTSURO.TV
+Registrant: REDACTED FOR PRIVACY（登録代行サービス）
+Created:  2036-10-18
+Expires:  2037-10-18
+<span class="dim"># 十年前の登録は失効している。取り直されたのは、透さんが逮捕された次の日。</span>`,
+ 'curl utsuro.tv':()=>`うつろ放送
+毎夜、三時三十三分。うつろの部屋をお見せします。
+<span class="dim"># 十年前のページと一文字も違わない。映像は utsuro.tv/live から届いている。</span>`,
+ 'curl utsuro.tv/live':()=>`（映像のデータ）<span class="dim"> # 中身ではなく、届くまでの経路を見よう。</span>`,
+ 'trace utsuro.tv/live':()=>TR2(),'trace utsuro.tv':()=>TR2(),
+};
+function TR2(){return `utsuro.tv/live の映像の経路:
+  1  edge.utsuro.tv
+  2  shikimi.relay-a.example
+  3  hinoki.relay-b.example
+  4  kusu.relay-c.example
+  5  tsubaki.relay-d.example
+  6  holly.ingest.example     ← 映像の取り込み口
+  取り込み元: ネットワークカメラ用クラウド（NC330 系）
+            既知の弱点あり。メーカーは直さないまま販売を終了
+<span class="dim"># 中継の名前は、組んだ人間が自分で付けたものだ。</span>`}
+function term2Fallback(k,raw){
+  if(/^(whois|curl|trace)$/.test(k))return '引数が必要です。例: '+k+' utsuro.tv';
+  if(/^(whois|curl|trace) /.test(k))return '応答がありません。utsuro.tv を調べよう。';
+  return `command not found: ${esc(raw.split(' ')[0])}`;
+}
+
+// ===== 第二話の章データ =====
+const LOTLOG=[['2027','00:13','03:33','04:46'],['2028','00:15','03:33','04:47'],['2029','00:12','03:33','04:46'],['2030','00:14','03:33','04:48'],['2031','00:13','03:33','04:46'],['2032','00:16','03:33','04:47'],['2033','00:14','03:33','04:47'],['2034','00:13','03:33','04:46'],['2035','00:15','03:33','04:47'],['2036','00:14','03:33','04:47']];
+const lotApp={id:'lotcam',name:'定点カメラ',icon:'rec',title:'柊さんのタブレット ― 跡地の定点カメラ',w:600,h:560,init:initZoom,html:`<div class="zoomable">${stream(lotSVG({figure:true,flower:true}),'REC 跡地 定点','2036/10/11<br>03:33:20')}</div>
+   <div class="cap">ランドリーの看板の上から、通りの向こうの跡地（駐車場）を映している。右が東。映像をクリックすると拡大できる。</div>
+   <b>毎年 10月11日の夜に映った人（柊さんが書き出したもの）</b>
+   <div class="tablewrap"><table><tr><th>年</th><th>駐車場に来た</th><th>花を置いた</th><th>駅の方へ去った</th></tr>
+   ${LOTLOG.map(r=>`<tr><td class="m">${r[0]}</td><td class="m">${r[1]}</td><td class="m">${r[2]}</td><td class="m">${r[3]}</td></tr>`).join('')}</table></div>
+   <div class="cap">どの年も、灰色のコートの同じ男。顔は映らないが、肩の傾け方とポケットに手を入れる癖でわかる。</div>`};
+const EVID=[
+ ['事務所の回線の記録','来客用の回線に NC330 が 4/14 からつながったまま。10/11 の 03:52 と 05:14 に、無人の事務所で送信量が跳ね上がる。'],
+ ['足場の工期と、近所の人の投稿','高木工務店の工期は 9/30 まで。10/1 に「足場が取れた」という投稿。週刊誌の写真は 10/1 より前のもの。'],
+ ['透さんの予定表','9/27（土）「夜．真壁さん宅．」。透さんは日付が変わるまで話し込んだ。'],
+ ['柊さんの定点カメラ','10/11 の 00:14〜04:47、透さんは月見台の跡地にいた。十年分、毎年同じ。'],
+ ['警備会社のサーバーで見た元の映像','9/28 00:37 の透さんと、誰もいない 10/11 04:21 の角。線を越えて見たもの。何もコピーしていない。'],
+];
+const evidCards=(n=EVID.length)=>`<div class="cards">${EVID.slice(0,n).map(([t,b])=>`<div class="card"><b>${t}</b>${b}</div>`).join('')}</div>`;
+const CH2=[
+{
+ id:1,no:'第一章',title:'見られている部屋',theme:'y2036',mark:'SHINOMIYA RESEARCH',clock:'2036/10/21 04:20',where:'篠宮リサーチ 事務所',
+ narr:[['','十一分の映像を、私は三回見返した。'],
+  ['','映っているのは、この事務所だ。窓際の私の机。その奥の、透さんの椅子。壁の時計は、12が上に、3が右にある。十年前のうつろ放送とは違って、映像は反転していない。'],
+  ['','誰かが、この部屋に、正しい向きでカメラを置いた。'],
+  ['','窓の外の首都高に、トラックが一台も走っていない。本物の窓の外では、今もトラックが途切れずに流れているのに。この映像は、ライブではない。'],
+  ['','いつの夜の映像なのか。カメラはどこにあるのか。天井を見上げずに、確かめなければならない。']],
+ chat:{with:'灯籠',quiet:true,msgs:[['灯籠','03:12','https://utsuro.tv/']],tail:'本文はなく、URLが一つだけ。三年前から連絡のなかったアカウントだった。'},
+ open:['rec'],
+ steps:[
+  {type:'text',q:'この映像が撮られたのは、何月何日の午前3時33分から？',
+   check:v=>md(10,11).test(v),
+   traps:[[md(10,10),'午前3時33分は、日付が変わったあとだ。'],[md(10,12),'その夜、透さんのスマホは透さんと一緒にあった。透さんの机の上を拡大しよう。'],[md(10,13),'祝日でトラックは少ない。でも、透さんの机の上を拡大しよう。'],[md(10,18),'透さんのスマホは 10/17 に押収されている。'],[md(10,19),'窓辺の花は、10/18 の捜索で片づけられている。'],[md(10,4),'窓辺の花は、まだ置かれていない。'],[md(10,5),'窓辺の花は、まだ置かれていない。']],
+   memo:'映像は 10/11（土）03:33 からの11分間。トラックがなく、窓辺に花、透さんの机にスマホ。真壁さんが殺された夜。'},
+  {type:'choice',q:'カメラは、見取り図のどこにある？',
+   options:['A　窓の上の角','B　入口の上の角','C　給湯室の中','D　透さんの机の上'],answer:1,
+   why:i=>i===0?'窓の上からでは、窓は映らない。映像では、窓が奥に見えている。':i===2?'給湯室の中からでは、私の机も透さんの椅子も壁にさえぎられる。':'映像は、部屋全体を少し高いところから見下ろしている。',
+   memo:'カメラは入口の上の角。半年前の合同調査で、二週間ほど捜査員が事務所に詰めていた。それ以外に、奥まで入った人はいない。'}
+ ],
+ hints:['録画に映った車の台数を、首都高の交通量の表と比べよう。トラックが少ない夜は一つではない。','「事務所の記録」で、窓辺の花と透さんのスマホがいつ事務所にあったかを確かめる。録画の透さんの机の上を拡大しよう。','映像は、私の机と透さんの椅子と窓を、少し高いところから一度に見下ろしている。窓が奥に見えるのは、どこから撮ったときか。'],
+ solved:`<p>映像は<b>10月11日（土）</b>の午前3時33分からの11分間。真壁さんが殺された夜だ。透さんの机の上には、まだスマホがある。</p>
+ <p>カメラは<b>入口の上の角</b>。給湯室の鏡で確かめると、火災報知器の横に黒い点が一つあった。三月の空調の点検のときには、なかったものだ。</p>
+ <p>見られている、と知らせるために、誰かがこの映像を私に見せた。透さんが「架純には連絡するな」と書いた意味が、少しだけわかった気がした。</p>`,
+ apps:[
+  {id:'rec',name:'録画',icon:'rec',title:'utsuro_1021.mp4 ― 録画した配信',w:600,h:460,flush:true,init:initZoom,html:browser('utsuro.tv/live',`<div class="zoomable">${stream(officeSVG({flower:true,phone:true}),'LIVE うつろ放送','03:35:12<br>視聴 1')}</div>
+   <div class="cap">10/21（火）03:33 から録画した11分間。11分のあいだに窓の外を通ったのは、乗用車4台とタクシー1台。トラックは0台。映像をクリックすると、その場所を拡大できる。</div>`)},
+  {id:'traffic',name:'交通量',icon:'sheet',title:'首都高 区間交通量（公開データ）',w:470,h:470,html:`<div class="cap">都心環状線・事務所前の区間。03:30〜03:45 に通った大型車（トラック）の台数</div>
+   <div class="tablewrap"><table><tr><th>日付</th><th>曜日</th><th>大型車</th></tr>
+   ${[['10/04','土',2],['10/05','日',1],['10/10','金',47],['10/11','土',0],['10/12','日',1],['10/13','月（祝）',2],['10/14','火',46],['10/17','金',48],['10/18','土',1],['10/19','日',0],['10/20','月',44],['10/21','火',45]].map(r=>`<tr><td class="m">${r[0]}</td><td>${r[1]}</td><td class="m">${r[2]}</td></tr>`).join('')}</table></div>
+   <div class="cap">日付はその日の午前3時台。平日の深夜は、荷物を運ぶトラックが途切れない。</div>`},
+  {id:'memo',name:'事務所の記録',icon:'doc',title:'事務所の記録（私のメモ）',w:460,h:380,html:`<div class="doc draft"><div class="meta">透さんの習慣</div>スマホはいつも持ち歩いている。毎年10月11日の夜だけは、事務所に置いて出かける。理由を聞いたら「その夜だけは，ログを残したくない」と言った。</div>
+   <div class="doc"><div class="meta">10/10（金）夜</div>透さん、窓辺に白い花を置いて出かける。</div>
+   <div class="doc"><div class="meta">10/11（土）午後</div>透さん、いつものように遅れて事務所へ。</div>
+   <div class="doc"><div class="meta">10/13（月・祝）</div>事務所は休み。</div>
+   <div class="doc"><div class="meta">10/17（金）朝</div>透さん逮捕。スマホは押収された。</div>
+   <div class="doc"><div class="meta">10/18（土）昼</div>警察が事務所を捜索。窓辺の花も、ほかの私物と一緒に片づけられた。</div>`},
+  {id:'plan',name:'見取り図',icon:'map',title:'事務所の見取り図',w:560,h:440,flush:true,html:planSVG()}
+ ]
+},
+{
+ id:2,no:'第二章',title:'holly',theme:'mio',mark:'',clock:'2036/10/21 07:00',where:'駅の反対側のネットカフェ',
+ narr:[['','事務所の機材は使わない。事務所の中のことが外に筒抜けなら、事務所の回線も同じだと考えたほうがいい。'],
+  ['','駅の反対側のネットカフェで、自分の古いノートパソコンを開いた。透さんに見つかる前から使っている一台だ。'],
+  ['','まず、透さんの投稿。逮捕の前の晩に届いた二通のメッセージと並べる。十年前の透さんは、書き方だけでは決めなかった。時刻と手順を確かめた。'],
+  ['','それから、うつろ放送。映像がどこから来ているのかを追う。ここから先は、四年間やらずにきたやり方になる。']],
+ chat:{with:'篠宮 透',quiet:true,msgs:[['篠宮 透','2036/10/16 23:48','ミオ．しばらく事務所に戻れない．<br>最初の事件のファイルを読め．全部そこにある．<br>鍵は，俺が最初に名乗った名前．'],['篠宮 透','23:49','架純には連絡するな．'],['me','23:51','どういうことですか？ 透さん？']],tail:'既読はついていない。'},
+ open:['post'],
+ steps:[
+  {type:'multi',q:'「全部俺がやった。」を書いたのは透さん本人だと言える根拠を、すべて選べ。',
+   options:['投稿は、私あての二通の1〜2分後に出ている','投稿は、透さんがいつも使うスマホのアプリから出ている','逮捕は翌朝で、その夜スマホは透さんの手元にあった','投稿は「。」で終わっている','一人称が「俺」になっている','透さんの書き方は、報告書やサイトで誰でも見られる'],
+   answer:[0,1,2],
+   why:sel=>sel.includes(3)?'「。」で終わっていることは、むしろ透さんらしくないところだ。':sel.includes(4)?'透さんも一人称は「俺」を使う。それだけでは、本人とも偽物とも言えない。':sel.includes(5)?'それは「誰でも真似できる」ということ。本人が書いた根拠にはならない。':'まだ足りない。時刻、投稿元、その夜スマホがどこにあったか。',
+   memo:'投稿は 23:50、私あての二通（23:48・23:49）の直後に、同じスマホのアプリから出た。書いたのは透さん本人。'},
+  {type:'choice',q:'それなら、透さんはなぜ投稿だけを「。」で書いたのか。',
+   options:['急いでいて、書き方を気にしなかったから','書かされたことを、私にだけ伝えるため','透さんの書き方を知らない誰かが書いたから','スマホの入力の設定が変わったから'],answer:1,
+   why:i=>i===2?'書いたのは透さん本人だと、さっき確かめた。':i===3?'1分前のメッセージは「．」で書かれている。':'1分前、私あてには「．」で書いている。',
+   memo:'透さんは、自分の書き方を知っていて外した。私に「最初の事件のファイルを読め」と書いたのは、そのため。透さんは、書かされた。'},
+  {type:'text',q:'うつろ放送の映像を中継している仕組みを組んだ人物の名前（ハンドル）は？',
+   check:v=>/holly|ひいらぎ|柊/.test(v),
+   traps:[[/shikimi|hinoki|kusu|tsubaki|樒|檜|楠|椿/,'それは中継の一つの名前。並んだ名前の中に、一つだけ違うものがある。'],[/灯籠|とうろう/,'URLを送ってきたのは灯籠のアカウント。でも、組んだ人の癖は別のところに出ている。']],
+   memo:'中継の名前は木の名前（樒・檜・楠・椿）で、最後だけ英語の holly。映像の取り込み元は、弱点の知られたカメラ用クラウド（NC330 系）。高校生のころ、夜中の掲示板で知っていた名前。「足跡が残ってる。癖は消せないよ」と、一度だけ私に書いてきた。'}
+ ],
+ hints:['投稿の時刻と、メッセージの時刻を並べよう。投稿元も見る。','透さんの書き方は隠していない癖で、誰でも真似できる。それでも本人が「。」で書いた理由は？','端末で whois utsuro.tv と trace utsuro.tv。中継の名前の付け方に、組んだ人の癖が出る。'],
+ solved:`<p>投稿は、私あての二通の直後に、同じスマホから出ていた。書いたのは透さん本人で、自分の書き方をわざと外している。<b>透さんは、書かされた</b>。</p>
+ <p>うつろ放送の中継には、木の名前が並んでいた。樒、檜、楠、椿、そして <b>holly</b>。透さんに見つかる前、夜中の掲示板で何度も見た名前だった。</p>
+ <p>灯籠さんのアカウントに、一行だけ返した。木の名前で、気づきました。返事は二時間後に来た。</p>`,
+ apps:[
+  {id:'post',name:'透の投稿',icon:'web',title:'篠宮 透 @ghostwire',w:460,h:420,flush:true,html:browser('tsubuyaki.example/ghostwire',`<div class="doc"><div class="meta">2036/10/16 23:50 ・ スマホアプリ</div>全部俺がやった。</div>
+   <div class="doc"><div class="meta">2036/10/02 21:14 ・ PC</div>事務所の窓から見る首都高，今夜は空いている．</div>
+   <div class="doc"><div class="meta">2036/09/18 12:03 ・ スマホアプリ</div>報告書の清書，いつも助かってる．</div>
+   <div class="cap">このアカウントの最後の投稿。翌朝、透さんは逮捕された。</div>`)},
+  {id:'term',name:'端末',icon:'term',title:'mio@old-x2: ~',w:620,h:480,flush:true,init:initTerm,html:`<div class="term"><div class="out" id="tout"></div>
+   <form id="tform"><span>$</span><input id="tin" name="search-cmd" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" aria-label="コマンド入力" placeholder="help"></form>
+   <div class="chips" id="tchips"></div></div>`},
+  {id:'site',name:'utsuro.tv',icon:'web',title:'うつろ放送',w:460,h:320,flush:true,html:`<div class="addr">${icon('web')}<span>https://utsuro.tv/</span></div><div class="site"><div class="body">
+    <div class="t">うつろ放送</div><p>毎夜、三時三十三分。うつろの部屋をお見せします。</p><p>部屋に誰かが映ったら、その方は招かれます。</p></div></div>`}
+ ]
+},
+{
+ id:3,no:'第三章',title:'跡地',theme:'mio',mark:'',clock:'2036/10/22 03:33',where:'月見台二丁目 コーポ月見台跡地',
+ narr:[['','スマホを部屋に置いて、東湾線の終電に乗った。月見台駅に着くのは零時五分。十年前、水野遼さんのスマホが記録されたのと同じ時刻だ。'],
+  ['','コーポ月見台は、もうない。跡地は小さな月極駐車場になっていた。通りの向かいでは、ツキミ ランドリーの看板が今も黄色く光っている。'],
+  ['柊','宮下柊といいます。灯籠は、父のアカウントです。'],
+  ['','宮下。十年前、302号室で亡くなった女性の名字だった。宮下沙耶。「姉です」と柊さんは言った。'],
+  ['柊','父は建物が取り壊されたあと、ランドリーの看板の上にカメラを付けた。娘がいた場所を見ていたい、とだけ言って。……毎年十月十一日の夜だけ、同じ人が映っている。']],
+ chat:{with:'灯籠',quiet:true,msgs:[['me','10/21 08:05','木の名前で、気づきました。'],['灯籠','10:12','会って話す。月見台二丁目三番八号。明日の三時三十三分。スマホは置いてきて。']]},
+ open:['lotcam'],
+ steps:[
+  {type:'text',q:'真壁さんが殺された午前4時半ごろ、透さんはどこにいた？',
+   check:v=>/月見台|跡地|駐車場|コーポ/.test(v),
+   traps:[[/真壁|現場|柚木台/,'定点カメラの記録で、その時刻を確かめよう。'],[/事務所/,'透さんのスマホは事務所にあった。でも、透さんは？']],
+   memo:'10/11 の 00:14〜04:47、透さんは月見台の跡地にいた。真壁さんが殺された4時半ごろも。'},
+  {type:'choice',q:'透さんは毎年、どうやって跡地に来て、帰っている？',
+   options:['終電で来て、始発で帰る','始発で来て、終電で帰る','終電で来て、タクシーで帰る','車で来て、車で帰る'],answer:0,
+   why:()=>'定点カメラに映った時刻を、東湾線の時刻表と比べよう。',
+   memo:'透さんは毎年、終電（月見台着 0:05）で来て、始発（4:58 発）で帰る。十年前、水野遼さんが乗れなかった始発。'},
+  {type:'multi',q:'柊さんが、この映像を警察に出せない理由を、すべて選べ。',
+   options:['映像を出せば、十年前の録画の本当の持ち主（灯籠＝宮下誠一）が明るみに出る','父が娘の部屋をのぞいていたことが知られる','証拠を扱うのは、事務所にカメラを仕掛けた人間がいるかもしれない課だ','映像は作り物だと疑われる','透さんに、出さないよう頼まれている'],
+   answer:[0,1,2],
+   why:sel=>sel.includes(3)?'十年分、同じ時刻に同じ男が映っている。作り物だと言える材料はない。':sel.includes(4)?'そんな話は、柊さんの話のどこにも出てこない。':'まだある。「柊さんの話」をもう一度読もう。',
+   memo:'不在証明を出せば、灯籠が宮下誠一だったこと、十年前の録画の出どころが「遼さんのパソコンのコピー」ではなかったことが明るみに出る。証拠を受け取るのは、サイバー犯罪対策課。透さんはそれを知っていて黙っている。'}
+ ],
+ hints:['定点カメラの 2036 年の行を見よう。透さんが映っていた時間は？','駐車場に来た時刻と去った時刻を、時刻表の終電・始発と比べよう。','「柊さんの話」で、柊さんが何を恐れているかを確かめよう。'],
+ solved:`<p>真壁さんが殺された4時半ごろ、透さんは<b>月見台の跡地</b>にいた。毎年、終電で来て始発で帰る。十年前、水野遼さんが乗れなかった始発だ。</p>
+ <p>それでも、この映像は出せない。出せば、十年前の録画の本当の出どころが明るみに出て、当時その説明に加わった架純さんも警察にいられなくなる。「篠宮さんは、全部わかっていて黙ってるんだと思う。父との約束を、まだ守ってる」。</p>
+ <p>柊さんは、置いた花を見下ろした。トルコキキョウ。沙耶さんが好きだった花だという。</p>`,
+ apps:[lotApp,
+  {id:'shu',name:'柊さんの話',icon:'people',title:'柊さんの話（聞きながら書いたメモ）',w:500,h:500,html:`<div class="doc"><div class="meta">灯籠のこと</div>灯籠は、柊さんの父・宮下誠一さん。宮下沙耶さんの父親。家を出た娘とは何年も口をきいていなかった。三年前に病気で亡くなり、アカウントと録画を柊さんが引き継いだ。</div>
+   <div class="doc"><div class="meta">2021年2月</div>沙耶さんが、弟の柊さん（当時14歳）にだけ電話をした。「部屋で誰かに見られている気がする」。柊さんはパスワードのないカメラの一覧サイトで、三日で姉の部屋を見つけ、父に見せた。誠一さんは、のぞいている相手の正体をつかんでから娘に話すつもりで、毎晩録画を始めた。三週間後に、沙耶さんは死んだ。</div>
+   <div class="doc"><div class="meta">2026年</div>「名前を出さないでくれ」と透さんに頼んだのは、娘の部屋をのぞいていた父親だと知られたくなかったから。透さんは約束を守り、録画を「水野遼さんのパソコンに残っていたコピー」として警察に出した。十一月の「花の配信」は、柊さん。遺族として一晩だけ部屋に入った。</div>
+   <div class="doc"><div class="meta">いま</div>「この映像を出せば、なぜこのカメラがここにあるのかを話すことになる。父のことも、姉の部屋の録画のことも、全部。それに、篠宮さんの事件の証拠を扱っているのは、サイバー犯罪対策課だ。事務所にカメラを仕掛けた人間がその中にいるなら、映像を渡す先が、その人の机の上かもしれない」</div>`},
+  {id:'timetable',name:'時刻表',icon:'sheet',title:'東湾線 月見台駅 時刻表（深夜・早朝）',w:430,h:330,html:`<div class="tablewrap"><table><tr><th>列車</th><th>時刻</th></tr>
+   <tr><td>下り 最終の一本前</td><td class="m">23:41 着</td></tr><tr><td>下り 終電</td><td class="m">00:05 着</td></tr>
+   <tr><td>上り 始発</td><td class="m">04:58 発</td></tr><tr><td>上り 2本目</td><td class="m">05:19 発</td></tr></table></div>
+   <div class="cap">駅から跡地までは歩いて10分ほど。</div>`},
+  {id:'news',name:'ニュース',icon:'news',title:'東都ニュース',w:460,h:300,flush:true,html:browser('news.touto.example/2036/10/12',`<div class="news"><div class="src">東都ニュース ・ 2036/10/12</div><h4>柚木台の住宅で記者が死亡　殺人事件として捜査</h4>
+    11日早朝、柚木台三丁目の住宅で、フリー記者の真壁恭介さん（45）が死亡しているのが見つかった。死亡したのは午前4時半ごろとみられる。警視庁は殺人事件として捜査している。</div>`)}
+ ]
+},
+{
+ id:4,no:'第四章',title:'足場',theme:'mio',mark:'',clock:'2036/10/22 09:40',where:'自分の部屋',
+ narr:[['','三日前、週刊誌のWeb版に防犯カメラの写真が載った。独占入手、犯行直後の篠宮容疑者か。'],
+  ['','最初に見たときは、ちゃんと見られなかった。今は違う。映っているのは、透さんとよく似た男ではない。透さん本人だ。肩の傾け方も、ポケットに手を入れる癖も。'],
+  ['','同じ時刻に、二十キロ離れた二つの場所に、同じ人が映っている。柊さんの映像が本物なら、嘘をついているのはこの写真のほうだ。写真の中の透さんは本物で、付いている日付が違う。']],
+ open:['weekly'],
+ steps:[
+  {type:'text',q:'写真の背景で工事をしていた会社の名前は？',
+   check:v=>/高木工務店|^高木$/.test(v),
+   traps:[[/^木工務店$|^工務店$/,'名前の前半が隠れている。シートの電話番号と合わせて検索しよう。'],[/並木/,'電話番号の下4桁が合わない。']],
+   memo:'足場のシートは高木工務店。ハイム柚木台の外壁改修工事で、工期は 8/4〜9/30。'},
+  {type:'text',q:'工事の足場がもう無かったと確かめられる、いちばん早い日は？',
+   check:v=>md(10,1).test(v),
+   traps:[[md(9,30),'工期の終わりは予定にすぎない。延びることもある。足場が取れたのを、実際に見た人はいないか。'],[md(10,11),'それは写真に付いている日付だ。'],[md(9,16),'その日は、まだ足場がある。']],
+   memo:'10/1 の昼に、近所の人が「足場が取れた」と投稿していた。写真は 10/1 より前に撮られたもの。'},
+  {type:'text',q:'写真が本当に撮られたのは、何月何日の夜？',
+   check:v=>md(9,27).test(v)||md(9,28).test(v),
+   traps:[[md(10,11),'それは書き換えられた日付だ。'],[md(9,30),'その日、透さんは真壁さんの家に行っていない。予定表を見よう。']],
+   memo:'9/27（土）の夜、透さんは真壁さんの家を訪ね、日付が変わるまで話し込んだ。写真はその帰り道。誰かが日付を 10/11 04:21 に書き換えた。'},
+  {type:'choice',q:'元の映像が、警備会社のサーバーから消えてしまうのはいつ？',
+   options:['10月11日','10月27日','10月28日','11月11日'],answer:2,
+   why:i=>i===1?'透さんが真壁さんの家を出たのは、日付が変わってから。映像は 9/28 のものだ。':'保存期間は30日。撮られた日から数えよう。',
+   memo:'元の映像は 9/28 の午前0時台のもの。30日後の 10/28 に消える。'}
+ ],
+ hints:['写真を拡大すると、足場のシートに会社名の後半と、電話番号の下4桁が読める。','「検索」で会社の工期と、近所の人の投稿を探そう（例：木工務店 4721、足場 柚木台）。','事務所の予定表で、透さんが真壁さんの家に行った日を探す。防犯カメラの保存期間は、マンションの案内に書いてある。'],
+ solved:`<p>写真は10月1日より前、<b>9月28日の午前0時台</b>に撮られたものだった。前の晩、透さんは真壁さんの家を訪ねていた。誰かが、その映像の日付を10月11日に書き換えた。預かった証拠を最初に調べるのは、サイバー犯罪対策課だ。</p>
+ <p>その夜、私はもう一度、線を越えた。警備会社のサーバーには元の映像が残っていた。9月28日の午前0時37分、足場の前を歩く透さん。10月11日の4時21分の同じ角には、誰も歩いていない。</p>
+ <p>私は何もコピーしなかった。違法に手に入れたものは、証拠にならない。元の映像が消えるのは、10月28日の午前0時37分。これを正しく残せるのは、私ではない。</p>`,
+ apps:[
+  {id:'weekly',name:'週刊誌',icon:'news',title:'週刊ミッドナイト Web版',w:600,h:500,flush:true,init:initZoom,html:browser('weekly-midnight.example/2036/10/19',`<div class="news"><div class="src">2036/10/19 ・ 独占入手</div><h4>犯行直後の篠宮容疑者か　防犯カメラがとらえた姿</h4>
+   <div class="zoomable">${stream(photoSVG(),'REC CAM-03','2036/10/11<br>04:21:07')}</div>
+   <p>真壁さん宅から約50メートル。通りに面したマンション「柚木台パークハウス」の防犯カメラが、灰色のコートの男をとらえていた。（写真をクリックすると拡大）</p></div>`)},
+  {id:'search',name:'検索',icon:'web',title:'Web 検索',w:520,h:520,flush:true,init:initSearch,html:`<div class="addr">${icon('web')}<span>search.example</span></div>
+   <form class="mapbar" style="background:var(--surface2);border-color:var(--line)"><input type="text" id="sq" name="search-web" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="検索（例：工務店 4721）" aria-label="Web 検索" style="background:var(--bg);border-color:var(--line);color:var(--fg)"><button class="btn sm" type="submit">検索</button></form>
+   <div class="page" id="sres"></div>`},
+  {id:'cal',name:'予定表',icon:'sheet',title:'事務所の予定表 ― 2036年9月',w:440,h:400,html:`<div class="tablewrap"><table><tr><th>日付</th><th>予定</th></tr>
+   <tr><td class="m">9/02（火）</td><td>依頼人面談</td></tr><tr><td class="m">9/11（木）</td><td>合同調査の報告書 提出</td></tr>
+   <tr><td class="m">9/20（土）</td><td>月次報告</td></tr><tr><td class="m">9/27（土）</td><td>夜．真壁さん宅．</td></tr><tr><td class="m">9/30（火）</td><td>経費精算</td></tr></table></div>
+   <div class="doc draft"><div class="meta">私のメモ ・ 9/29（月）</div>透さん、真壁さんとは日付が変わるまで話し込んだ、と言っていた。何の話だったのかは言わなかった。</div>`}
+ ]
+},
+{
+ id:5,no:'第五章',title:'聞かれていた部屋',theme:'y2036',mark:'SHINOMIYA RESEARCH',clock:'2036/10/23 13:10',where:'篠宮リサーチ 事務所',
+ narr:[['','何事もなかったような顔で事務所に出た。入口の上の角は見ない。'],
+  ['','透さんは、事務所の回線を通るものを全部記録に残している。どの機器が、いつ、どれだけのデータを送ったか。一分ごとに、九十日分。'],
+  ['','回線は二つ。私たちが使うものと、来客用のもの。来客用は、半年前の合同調査のときに捜査員のために作った。それからは、月に一度の点検でも見ていなかった。'],
+  ['','カメラの映像は、動きのない場面ほど小さく縮められる。誰もいない夜の事務所なら、送るデータはほとんど平らな線になるはずだ。']],
+ open:['net'],
+ steps:[
+  {type:'text',q:'うつろ放送の取り込み元と同じ種類のカメラが、来客用の回線につながっている。最初につながったのはいつ？',
+   check:v=>md(4,14).test(v),
+   traps:[[md(4,25),'それは、捜査員のノートパソコンが最後に切れた日だ。']],
+   memo:'NC330 は 4/14、合同調査の初日から来客用の回線につながったまま。'},
+  {type:'text',q:'10月11日の夜、誰もいない事務所で何かが最初に動いたのは何時何分？',
+   check:v=>/^0?3[:時.]?52分?$/.test(v),
+   traps:[[/^0?3[:時.]?(3[3-9]|4[0-4])分?$/,'その11分間は、柊さんが流した映像そのもの。誰も映っていない。'],[/^0?5[:時.]?1[4-6]分?$/,'それは二度目。最初の動きは？'],[/^0?4[:時.]?[0-5]\d分?$/,'その時刻の送信量は平らなままだ。']],
+   memo:'10/11 の 03:52〜03:57 と 05:14〜05:16、無人の事務所で送信量が跳ね上がった。透さんのスマホが持ち出され、戻された時刻。ただし、これだけでは「透さんが取りに戻った」と言われれば反論できない。'},
+  {type:'choice',q:'翌朝、サイバー犯罪対策課の榊原警部が、書類を持って事務所に来た。<br><span class="say">榊原</span>何度もお邪魔して申し訳ない。<br><span class="say">榊原</span>春日さん、でしたね。ここに来て、何年になります。<br><span class="say">榊原</span>四年。篠宮さんが自分で見つけてきた人だそうですね。優秀なんでしょう。<br>この部屋の会話を聞いていたとわかるのは、どの言葉？',
+   options:['何度もお邪魔して申し訳ない','ここに来て、何年になります','篠宮さんが自分で見つけてきた人','優秀なんでしょう'],answer:2,
+   why:()=>'その言葉なら、誰が言ってもおかしくない。「事務所メモ」で、私がここに来た経緯がどう紹介されていたか確かめよう。',
+   memo:'「見つけてきた」は、九月の終わりの夜、この部屋で透さんが口にしただけの言葉。榊原は、天井のカメラで聞いていた。'}
+ ],
+ hints:['端末で trace utsuro.tv をしたときの「取り込み元」の種類を思い出そう。回線の記録の機器一覧にある。','グラフの日付を 10/11 にして、山をタップすると時刻が出る。03:33〜03:44 は、柊さんが流した11分間。','事務所メモで、合同調査のときに私がどう紹介されたか、九月の終わりの夜に透さんが何と言ったかを確かめよう。'],
+ solved:`<p>カメラは<b>4月14日</b>、合同調査の初日から来客用の回線につながっていた。10月11日の<b>3時52分</b>と5時14分、無人の事務所で何かが動いた。透さんのスマホが持ち出され、戻された時刻だ。</p>
+ <p>「見つけてきた」。私がここに来た経緯を、透さんは誰にも話していない。あの言葉を聞いたのは、九月の終わりの夜、この部屋でだけだ。七月の夜には、十年前の録画の本当の出どころの話もした。</p>
+ <p>透さんの弱みは、一つではなかった。不在証明を出せば宮下家と十年前の録画に行き着き、架純さんは警察にいられなくなる。口を開けば、次は私の名前が出る。透さんは、架純さんと私を守るために黙っている。</p>
+ <p>私は、透さんの言いつけを一つだけ破ることにした。</p>`,
+ apps:[
+  {id:'net',name:'回線の記録',icon:'wave',title:'回線の記録 ― 来客用',w:640,h:540,init:initNet,html:`<b>来客用の回線に接続した機器</b>
+   <div class="tablewrap"><table><tr><th>機器</th><th>最初</th><th>最後</th><th>種類</th></tr>
+    <tr><td class="m">NB-MPD-0412</td><td class="m">04/14 09:31</td><td class="m">04/25 18:02</td><td>ノートPC</td></tr>
+    <tr><td class="m">NB-MPD-0388</td><td class="m">04/14 09:40</td><td class="m">04/25 17:55</td><td>ノートPC</td></tr>
+    <tr><td class="m">NC330-7F2A</td><td class="m">04/14 16:52</td><td>接続中</td><td>不明</td></tr></table></div>
+   <b>NC330-7F2A の送信量（1分ごと、03:30〜05:30）</b>
+   <div class="seg" role="group" aria-label="日付"><button type="button" data-day="10/10" class="on">10/10</button><button type="button" data-day="10/11">10/11</button><button type="button" data-day="10/12">10/12</button></div>
+   <div id="netbox"></div><div class="cap" id="netcap"></div>
+   <div class="cap">日付は、その日の午前3時半からの2時間。</div>`},
+  {id:'memo2',name:'事務所メモ',icon:'doc',title:'事務所メモ',w:480,h:470,html:`<div class="doc"><div class="meta">合同調査（警視庁サイバー犯罪対策課）</div>4/14（月）〜4/25（金）。捜査員が事務所に詰める。来客用の回線を用意した。<br>事務所の鍵を1本貸し出し（4/14）、返却（4/25）。</div>
+   <div class="doc"><div class="meta">捜査員への紹介（4/14）</div>春日：高校生のころから手伝っているアルバイト上がり。</div>
+   <div class="doc draft"><div class="meta">私の記憶 ・ 7月の終わりの夜</div>透さん「出さないって約束したんだ。あの録画は、遼さんのパソコンにあったコピーとして警察に出した。本当の持ち主がいることを知ってるのは、俺と架純だけだ」</div>
+   <div class="doc draft"><div class="meta">私の記憶 ・ 9月の終わりの夜（四年前、透さんが私の部屋のドアを叩いた日）</div>透さん「四年前にお前を見つけたのが俺でよかったな。お前が告発した会社の件、被害届はまだ生きてるからな。サイバー犯罪対策課の棚に、未解決のまま積んである」</div>`}
+ ]
+},
+{
+ id:6,no:'第六章',title:'見逃す',theme:'mio',mark:'',clock:'2036/10/25 03:33',where:'月見台二丁目 コーポ月見台跡地',
+ narr:[['','メールも電話も、全部ログに残る。だから紙に書いた。帰りの電車の中で、架純さんのコートのポケットに滑りこませた。'],
+  ['','月見台二丁目三番八号。土曜日の午前三時三十三分。スマホは置いてきてください。柊さんの書き方を、そのまま借りた。'],
+  ['架純','連絡するなって、言われてたんじゃないの。……あの二通を読んで、少しだけ安心した。点と丸が、いつものあの人だったから。'],
+  ['架純','投稿のほうは、あの人の書き方じゃない。でも、書き方の癖なんて証拠にならない。十年前、私が警察の窓口で言われたことよ。'],
+  ['','架純さんが動ける証拠を、渡さなければならない。私が線を越えて見たもの以外で。']],
+ open:['evid'],
+ steps:[
+  {type:'multi',q:'架純さんに渡せる（正規の証拠にできる）ものを、すべて選べ。',
+   options:EVID.map(e=>e[0]),answer:[0,1,2,3],
+   why:sel=>sel.includes(4)?'それは線を越えて見たものだ。渡せば、証拠でなくなる。架純さんも動けなくなる。':'まだ渡せるものがある。誰でも確かめられるもの、持ち主が自分から差し出せるものは？',
+   memo:'架純さんに渡すのは、回線の記録、足場の工期と投稿、予定表、柊さんの録画。警備会社のサーバーで見たものは渡さない。'},
+  {type:'text',q:'架純さんが令状で元の映像を押さえなければならない期限は？（月日）',
+   check:v=>md(10,28).test(v),
+   traps:[[md(10,27),'映像が撮られたのは 9/28 の午前0時37分。30日後は？'],[md(10,11),'それは書き換えられた日付だ。']],
+   memo:'9/28 00:37 の映像は、10/28 00:37 に消える。'},
+  {type:'choice',q:'カメラは、まだ事務所の天井にある。持ち主を事務所に来させるには？',
+   options:['架純さんが、榊原に直接問いただす','事務所で、明日業者に天井の機械を見てもらうと、カメラに聞こえるように電話する','カメラを自分で外して、警察に届ける','うつろ放送で、榊原の名前を流す'],answer:1,
+   why:i=>i===0?'まだ証拠が足りない。問いただせば、向こうは先に手を打つ。':i===2?'外してしまえば、持ち主がここに来る理由がなくなる。':'名前を流しても、証拠にはならない。',
+   memo:'「明日、業者に天井を見てもらう」とカメラに聞かせれば、持ち主は今夜のうちに外しに来るしかない。製造番号から持ち主にたどり着くから。'}
+ ],
+ hints:['正規の証拠にできるのは、誰でも確かめられるものか、持ち主が自分から差し出せるものだ。','映像の保存期間は30日。撮られたのは 9/28 の午前0時37分。','持ち主にとって、外されて調べられると困るものは何か。'],
+ solved:`<p>「九月二十八日の、零時三十七分」と架純さんは繰り返した。「そこまでは、案内にも予定表にも書いてない」。私は答えなかった。架純さんは、ふっと視線を外した。「<b>聞かないでおく</b>」。</p>
+ <p>柊さんが名乗った。「十年前、灯籠という名前で録画を渡したのは、僕の父です。宮下沙耶の、父親です」。架純さんは目を閉じて、小さく笑った。「あの人、また私をかばったのね」。</p>
+ <p>月曜日、架純さんは十年前の録画の出どころを自分から申し出て、榊原を通さずに令状を取る。柊さんは父の名前を出すと決めた。そして天井のカメラには、外しに来てもらう。</p>`,
+ apps:[{id:'evid',name:'手元の証拠',icon:'doc',title:'手元にあるもの',w:560,h:440,html:evidCards()},lotApp]
+},
+{
+ id:7,no:'第七章',title:'入口の上',theme:'y2036',mark:'SHINOMIYA RESEARCH',next:'調査を終える',clock:'2036/10/28 03:41',where:'篠宮リサーチ 事務所',
+ narr:[['','10月27日、月曜日の夕方。事務所の電話が鳴った。「篠宮さんのお宅でしょうか」。違います、と答えると、電話は切れた。架純さんと決めておいた合図だ。警備会社の映像は、令状で押さえられた。'],
+  ['','私はもう一度受話器を取った。今度は、天井のカメラに聞かせるための電話だ。入口の上の角に、見覚えのない機械が付いている。明日の朝いちばんに、業者さんに見てもらえませんか。'],
+  ['','零時過ぎ、架純さんと捜査本部の刑事が二人、明かりを点けずに入った。カメラは入口の上から部屋の奥を見下ろしている。入口のすぐ下だけは映らない。'],
+  ['','三時四十一分。鍵穴に、鍵が差しこまれる音がした。踏み台の上の人影に向けて、私は壁のスイッチを押した。'],
+  ['榊原','春日さん。こんな時間に、明かりも点けずに。']],
+ open:['evid'],
+ steps:[
+  {type:'choice',tag:'対決 1',q:'<span class="say">榊原</span>私は捜査で来ている。この事務所に不審な機器があると聞いてね。証拠が持ち出される前に、確保しに来た。<br>どの事実で崩す？',
+   options:['天井の機械の話は、夕方に事務所の中の電話でしかしていない','カメラは 4/14 から来客用の回線につながっていた','週刊誌の写真には、工事の足場が写っている','透さんは毎年、終電で来て始発で帰る'],answer:0,
+   why:()=>'それは、今夜ここに来た理由を崩さない。「不審な機器がある」と、榊原はどこで聞いたのか。',
+   memo:'天井の機械の話は、夕方、事務所の中でしかしていない。聞けたのは、カメラの向こうにいた人間だけ。'},
+  {type:'choice',tag:'対決 2',q:'<span class="say">榊原</span>十月十一日の夜？ 篠宮さんが自分で、事務所にスマホを取りに戻ったんだろう。<br>どの事実で崩す？',
+   options:['3:52 と 5:14 に、無人の事務所で送信量が跳ね上がった','その時間、透さんは月見台の跡地にいた（定点カメラ 0:14〜4:47）','投稿は、私あての二通の直後に出ている','カメラのクラウドの録画は、3:45 から 5:20 まで消されていた'],answer:1,
+   why:()=>'それは、誰かが動いたことは示しても、それが透さんでないことは示さない。',
+   memo:'その時間、透さんは月見台の跡地にいた。そこにカメラがあることを、透さんは知っていた。'},
+  {type:'choice',tag:'対決 3',q:'<span class="say">榊原</span>防犯カメラには、真壁さんの家の近くを歩く篠宮さん本人が映っていた。<br>どの事実で崩す？',
+   options:['写真の背景の足場は、10月1日にはもう撤去されていた','写真はピントが甘く、顔が見えない','透さんは真壁さんの情報源だった','真壁さんの家から事務所までは車で20分かかる'],answer:0,
+   why:i=>i===1?'映っているのは、確かに透さん本人だ。違うのは日付のほう。':'それでは、その夜に透さんがそこにいなかったことにはならない。',
+   memo:'防犯カメラの映像は 9/28 のもの。日付が 10/11 に書き換えられていた。'},
+  {type:'choice',tag:'対決 4',q:'<span class="say">榊原</span>日付を書き換えた？ 預かった映像に、そんな跡がどこにある。<br>どの事実で崩す？',
+   options:['令状で押さえた警備会社の元の映像では、10/11 4:21 の角に誰もいない','私が警備会社のサーバーで見た元の映像','預かった映像を最初に調べるのは、サイバー犯罪対策課だ','透さんは真壁さんの家に、9/27 の夜に行っている'],answer:0,
+   why:i=>i===1?'それは線を越えて見たものだ。ここで出せば、証拠でなくなる。':'それだけでは、書き換えがあったことを示せない。',
+   memo:'令状で押さえた元の映像では、10/11 04:21 の角には誰もいない。猫が一匹、横切っただけ。'},
+  {type:'text',tag:'最後',q:'<span class="say">榊原</span>……私がこの事務所に入った証拠など、どこにもない。<br>何を出させる？',
+   check:v=>/ポケット|合鍵|鍵|かぎ/.test(v),
+   traps:[[/カメラ|天井/,'カメラはもう天井にない。榊原は、外したものをどこにしまった？'],[/スマホ|携帯|靴|手袋/,'榊原がドアを開けるのに使ったものは？']],
+   memo:'榊原のポケットには、外したばかりのカメラと、四月に作った事務所の合鍵。'}
+ ],
+ hints:['榊原の言い分ごとに、捜査ノートの「わかったこと」を見返そう。','対決4では、正規の証拠だけを使う。線を越えて見たものは出せない。','最後は、榊原がドアを開けるのに使ったものと、天井から外したもの。どこにしまった？'],
+ solved:`<p>「ログは嘘をつかない。嘘をつくのは、ログを読む人間だ」と私は言った。「透さんの口癖です。この事件のログを最初に読んだのは、あなたでした」</p>
+ <p>給湯室の戸が開いた。「榊原警部。住居侵入の現行犯で、逮捕します。ポケットの中の物も、お預かりします」。架純さんの声は、震えていなかった。</p>`,
+ apps:[{id:'evid',name:'手元の証拠',icon:'doc',title:'手元にあるもの',w:560,h:440,html:evidCards(4)+`<div class="card" style="margin-top:10px"><b>令状で押さえた元の映像</b>警備会社のサーバーの 9/28 00:37 と 10/11 04:21。架純さんが 10/27 に正規に押さえた。</div>`}]
+}
+];
+function ending2(){
+  return `<div class="ending">
+   <div class="eyebrow">解決</div>
+   <h2>不在証明</h2>
+   <p>警察の証拠を管理する記録には、10月13日の夜、預かった映像のうち一つの日付が書き換えられた跡が残っていた。書き換えたのは、榊原の端末だった。天井のカメラを見ていた記録は、榊原の家の回線に行き着いた。ポケットの合鍵は、事務所のドアに合った。</p>
+   <p>11月4日、榊原恒一は、真壁恭介さんを殺害した疑いで、あらためて逮捕された。真壁さんは、八年前の事件で榊原が証拠を捏造した疑いを追っていた。同じ日の朝、透さんは釈放された。</p>
+   <div class="epi">
+    <div class="eyebrow" style="color:#8fa4c9">その後</div>
+    <p>十年前の録画は、裁判で改めて調べ直されることになった。久我圭吾は、宮下沙耶さんを殺した罪について再審を請求した。水野遼さんの事件は、何も揺らいでいない。柊さんは、父の誠一さんのことを、自分の名前で警察に話した。</p>
+    <p>架純さんは、透さんの事件から外された。処分はまだ決まっていない。別れ際、架純さんは手書きの紙を一枚、私の手に握らせた。「連絡するなって言われてたんでしょう。だから、今度は私から連絡する」。</p>
+   </div>
+   <div class="present">
+    <p>警察署の前で、透さんは私の顔を見て、最初にこう言った。「読んだか」。読みました、全部、と私は答えた。</p>
+    <p>「全部俺がやった、の『。』。気づくと思ってましたか」「お前なら気づくと思った」。架純さんも気づいてました、と言うと、透さんは少しのあいだ黙った。「そうか」。</p>
+    <p>駅の手前の花屋で、私は白い花の名前を教えた。トルコキキョウ。透さんは十年間、名前を知らないまま、同じ花を買っていた。</p>
+    <p>その夜、事務所でメッセージが一通届いた。机の向こうの椅子に、透さんが座っているのに。</p>
+    <p class="mono">ミオ．明日から報告書の清書，頼む．</p>
+    <p>翌年の10月11日。私は透さんと二人で終電を降りて、跡地へ歩いた。3時33分、透さんは車止めの脇に花を一輪置いた。</p>
+    <p>私のスマホが震えた。うつろ放送が始まりました。開くと、駐車場の東の端に、二つの後ろ姿が映っていた。振り返っても、ランドリーの看板の上にカメラはない。柊さんのカメラは、まだ警察に預けたままだ。視聴者は、1。</p>
+    <p>3時38分。踏切は鳴らなかった。日曜日の夜明け前に、貨物は走らない。手の中の画面も、静かなままだった。</p>
+    <p>今度は、録画ボタンを押さなかった。ログは嘘をつかない。けれど、ログが残らないこともある。残さないと決める夜も、たぶんある。</p>
+   </div>
+   <div class="teaser"><div class="eyebrow" style="color:#8fa4c9">その先</div>
+    <p>取り調べの最後に、榊原は一つだけ聞き返したという。篠宮のところの若いのは、元気にしているか。四年前の未解決の事件の資料は、今も榊原の課の棚に積まれたままだ。</p></div>
+   <p class="cap">試作版はここまでです。</p>
+   <div class="endbtns"><button type="button" class="back" id="endTitle">タイトルに戻る</button><button type="button" class="back" id="endBack">デスクトップに戻る</button></div></div>`;
+}
+
+// ===== 話（エピソード） =====
+// 保存データは話ごとに別のキーにする。第一話は以前からのキーのままなので、前の進行状況を引き継ぐ
+const EPS={
+ 1:{key:'utsuro-save-v4',title:'無人放送',file:'事件ファイル 2026_utsuro',ch:CH1,ending:ending1,
+    term:{cmds:TERM1,fallback:term1Fallback,banner:'ghostwire OSINT shell ・ help でコマンド一覧',chips:['help','history','view-source ','whois ','wayback ','analytics ','curl ']}},
+ 2:{key:'utsuro2-save-v1',title:'不在証明',file:'調査メモ 2036 不在証明',ch:CH2,ending:ending2,
+    term:{cmds:TERM2,fallback:term2Fallback,banner:'mio@old-x2 ・ help でコマンド一覧',chips:['help','whois ','curl ','trace ']}},
+};
+
 // ===== 状態 =====
-const KEY='utsuro-save-v4';
 const fresh=()=>({cur:0,done:{},hints:{},nr:{},seen:{}});
-let S=fresh();
-try{const s=JSON.parse(localStorage.getItem(KEY)||'null');if(s&&Number.isInteger(s.cur)&&s.cur>=0&&s.cur<CH.length&&s.done)S=Object.assign(fresh(),s)}catch(e){}
+let EP=1,CH=CH1,KEY=EPS[1].key,S=fresh();
+function loadSave(n){
+  try{const s=JSON.parse(localStorage.getItem(EPS[n].key)||'null');if(s&&Number.isInteger(s.cur)&&s.cur>=0&&s.cur<EPS[n].ch.length&&s.done)return Object.assign(fresh(),s)}catch(e){}
+  return fresh();
+}
+// 話を切り替える。端末・地図・ハッシュ比較の一時的な状態も話ごとに持たないので、ここで消す
+function setEp(n){
+  EP=n;CH=EPS[n].ch;KEY=EPS[n].key;S=loadSave(n);
+  if(!unlocked(S.cur))S.cur=0;
+  termLog=null;termHist=[];MAP={sel:null,q:'',rails:true};hsel=[];
+}
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 function norm(s){return (s||'').normalize('NFKC').replace(/\s+/g,'').toLowerCase()}
 function esc(s){return String(s).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]))}
@@ -1028,7 +1562,7 @@ function noteHTML(){
   const shown=first===-1?c.steps.length:first+1,hn=S.hints[c.id]||0,done=chDone(c);
   const hints=done?'':`<div class="hints">${c.hints.slice(0,hn).map((h,i)=>`<div class="hint">ヒント${i+1}：${h}</div>`).join('')}
    ${hn<c.hints.length?`<button class="btn ghost sm" type="button" id="hbtn" style="align-self:flex-start">ヒントを見る（${hn+1}/${c.hints.length}）</button>`:''}</div>`;
-  const last=S.cur===CH.length-1,label=S.cur===0?'2026_utsuro を開く':last?'事件ファイルを閉じる':'次の章へ';
+  const last=S.cur===CH.length-1,label=c.next||(last?'事件ファイルを閉じる':'次の章へ');
   const sol=done?`<div class="solved"><div class="num" style="color:var(--ok);font-family:var(--f-mono);font-size:11px;letter-spacing:.12em">解明</div>${c.solved}<button class="btn" id="nx" type="button">${label}</button></div>`:'';
   const memos=[];CH.forEach(x=>x.steps.forEach((st,i)=>{if(stepDone(x,i))memos.push(`<li><span class="mono" style="color:var(--muted)">${stepLabel(x,st,i)}</span> ${st.memo}</li>`)}));
   return `<div class="nt-head"><b>${c.no}　${c.title}</b><span>${c.clock} ・ ${c.where}</span></div>
@@ -1076,11 +1610,11 @@ function chatApp(c){
   const ch=c.chat,key='chat'+c.id;
   return {id:'chat',name:'メッセージ',icon:'chat',title:`メッセージ ― ${ch.with}`,w:380,h:470,flush:true,
    html:`<div class="chathead"><span class="av">${ch.with.slice(0,1)}</span><b>${ch.with}</b></div><div class="chat">
-    ${ch.msgs.map(m=>`<div class="bubble ${m[0]==='me'?'me':''}"><span class="n">${m[0]==='me'?(c.id?'透':'ミオ'):m[0]} ・ ${m[1]}</span>${m[2]}</div>`).join('')}
+    ${ch.msgs.map(m=>`<div class="bubble ${m[0]==='me'?'me':''}"><span class="n">${m[0]==='me'?(c.theme==='y2026'?'透':'ミオ'):m[0]} ・ ${m[1]}</span>${m[2]}</div>`).join('')}
     ${ch.tail?`<div class="cap" style="align-self:flex-end">${ch.tail}</div>`:''}</div>`,
-   // 初めて開いたときだけ、入力中の表示をはさんで一通ずつ届く
+   // 初めて開いたときだけ、入力中の表示をはさんで一通ずつ届く（読み返すだけの quiet のチャットは除く）
    init:el=>{
-    if(S.seen[key])return;
+    if(S.seen[key]||ch.quiet)return;
     S.seen[key]=true;save();
     document.querySelector('#icons [data-app="chat"] .badge')?.remove();
     if(reduceMotion)return;
@@ -1112,7 +1646,7 @@ function openApp(id){
   const el=document.createElement('section');
   el.className='win';el.dataset.win=id;el.setAttribute('aria-label',a.title);
   el.style.cssText=`left:${Math.max(8,Math.min(x,dw-w-8))}px;top:${Math.max(8,Math.min(y,dh-h-8))}px;width:${w}px;height:${h}px`;
-  el.innerHTML=`<div class="tb"><span class="ti">${icon(a.icon)}${a.title}</span><button type="button" class="wb" data-min aria-label="最小化">–</button><button type="button" class="wb x" data-close aria-label="閉じる">×</button></div><div class="bd ${a.flush?'flush':''}">${typeof a.html==='function'?a.html():a.html}</div>`;
+  el.innerHTML=`<div class="tb"><span class="ti">${icon(a.icon)}${a.title}</span><button type="button" class="wb" data-min aria-label="最小化">–</button><button type="button" class="wb x" data-close aria-label="閉じる">×</button></div><div class="bd ${a.flush?'flush':''}">${typeof a.html==='function'?a.html():a.html}</div><div class="rz" aria-hidden="true"></div>`;
   $('wins').appendChild(el);WIN[id]=el;
   el.addEventListener('pointerdown',()=>focusWin(id));
   el.querySelector('[data-close]').onclick=()=>{el.remove();delete WIN[id];renderTasks()};
@@ -1138,6 +1672,19 @@ function makeDraggable(el){
       el.style.top=Math.max(0,Math.min(t0+(ev.clientY-sy)/z,d.clientHeight-34))+'px';};
     const up=()=>{tb.removeEventListener('pointermove',move);tb.removeEventListener('pointerup',up)};
     tb.addEventListener('pointermove',move);tb.addEventListener('pointerup',up);
+  });
+  // 右下のつまみで大きさを変える。移動と同じく、マウスの移動量を拡大率で割る
+  const rz=el.querySelector('.rz');
+  rz.addEventListener('pointerdown',e=>{
+    e.preventDefault();
+    const d=$('desk'),z=el.getBoundingClientRect().width/el.offsetWidth||1;
+    const sx=e.clientX,sy=e.clientY,w0=el.offsetWidth,h0=el.offsetHeight;
+    rz.setPointerCapture(e.pointerId);
+    const move=ev=>{
+      el.style.width=Math.max(260,Math.min(w0+(ev.clientX-sx)/z,d.clientWidth-el.offsetLeft))+'px';
+      el.style.height=Math.max(160,Math.min(h0+(ev.clientY-sy)/z,d.clientHeight-el.offsetTop))+'px';};
+    const up=()=>{rz.removeEventListener('pointermove',move);rz.removeEventListener('pointerup',up)};
+    rz.addEventListener('pointermove',move);rz.addEventListener('pointerup',up);
   });
 }
 function renderTasks(){
@@ -1181,11 +1728,11 @@ function advance(){if(NR.typing){NR.finish();return}if(NR.i<NR.lines.length-1){N
 // ===== 章の切り替え =====
 function renderMenu(){
   const m=$('menu');
-  m.innerHTML=`<div class="h">事件ファイル 2026_utsuro</div>${CH.map((c,i)=>`<button type="button" data-ch="${i}" class="${i===S.cur?'cur':''}" ${unlocked(i)?'':'disabled'}>${chDone(c)?'✓ ':'　'}${c.no}　${c.title}</button>`).join('')}
+  m.innerHTML=`<div class="h">${EPS[EP].file}</div>${CH.map((c,i)=>`<button type="button" data-ch="${i}" class="${i===S.cur?'cur':''}" ${unlocked(i)?'':'disabled'}>${chDone(c)?'✓ ':'　'}${c.no}　${c.title}</button>`).join('')}
    <hr><button type="button" id="mreset">最初からやり直す</button><button type="button" id="mtitle">タイトルに戻る</button>`;
   m.querySelectorAll('[data-ch]').forEach(b=>b.onclick=()=>{toggleMenu(false);enterChapter(+b.dataset.ch)});
   $('mreset').onclick=()=>{
-    m.innerHTML=`<div class="confirm">進行状況を消しますか？ <button class="btn sm" type="button" id="ry">消す</button><button class="btn ghost sm" type="button" id="rn">やめる</button></div>`;
+    m.innerHTML=`<div class="confirm">「${EPS[EP].title}」の進行状況を消しますか？ <button class="btn sm" type="button" id="ry">消す</button><button class="btn ghost sm" type="button" id="rn">やめる</button></div>`;
     $('ry').onclick=()=>{S=fresh();termLog=null;termHist=[];MAP={sel:null,q:'',rails:true};hsel=[];save();toggleMenu(false);enterChapter(0)};
     $('rn').onclick=renderMenu;};
   $('mtitle').onclick=()=>{toggleMenu(false);showTitle()};
@@ -1203,17 +1750,21 @@ function enterChapter(i,withCard=true){
   const from=S.cur;S.cur=i;save();
   const c=CH[i];
   Object.values(WIN).forEach(w=>w.remove());WIN={};cascade=0;
+  // 前の章の通知が残ると、押しても開くアプリがないので消す
+  document.querySelectorAll('.toast').forEach(t=>t.remove());
   $('screen').className=c.theme;$('desk').dataset.mark=c.mark;$('wall').innerHTML=WALL[c.theme];
   $('clock').innerHTML=c.clock.replace(' ','<br>');
-  const unread=a=>a.id==='chat'&&!S.seen['chat'+c.id];
+  // quiet のチャットは前に届いたメッセージを読み返すものなので、未読の印も通知も出さない
+  const unread=a=>a.id==='chat'&&!c.chat.quiet&&!S.seen['chat'+c.id];
   $('icons').innerHTML=appsOf(c).map(a=>`<button type="button" data-app="${a.id}"><span class="tile t-${a.icon}">${icon(a.icon)}${unread(a)?'<i class="badge" aria-label="未読"></i>':''}</span><span class="lb">${a.name}</span></button>`).join('');
   $('icons').querySelectorAll('[data-app]').forEach(b=>b.onclick=()=>openApp(b.dataset.app));
   openApp('note');c.open.forEach(openApp);
   if(chDone(c))narrate(solvedLines(c));
   else narrate(c.narr,Number.isInteger(S.nr[c.id])?S.nr[c.id]:0,c.id);
-  if(c.chat&&!S.seen['chat'+c.id]){const m=c.chat.msgs[0];setTimeout(()=>toast(m[0],m[2].replace(/<br>/g,' ').slice(0,40)+'…','chat'),400)}
+  if(c.chat&&!c.chat.quiet&&!S.seen['chat'+c.id]){const m=c.chat.msgs.find(x=>x[0]!=='me');setTimeout(()=>toast(m[0],m[2].replace(/<br>/g,' ').slice(0,40)+'…','chat'),400)}
   renderMenu();
-  if(withCard)showCard(c,from===0&&i===1);
+  // 起動の表示（boot）は、前の章から続けて開いたときだけ出す
+  if(withCard)showCard(c,from===i-1?c.boot:'');
 }
 function showCard(c,boot){
   const card=$('card');
@@ -1221,18 +1772,21 @@ function showCard(c,boot){
   card.classList.remove('out');card.setAttribute('aria-hidden','false');
   const close=()=>{card.classList.add('out');card.setAttribute('aria-hidden','true')};
   card.onclick=close;
-  if(boot&&!reduceMotion)card.querySelector('.boot').textContent='$ mount 2026_utsuro.img /mnt/case\n  ghostwire-x13 / 2026-10-19 snapshot ... ok\n';
+  if(boot&&!reduceMotion)card.querySelector('.boot').textContent=boot;
   setTimeout(close,reduceMotion?900:2600);
 }
 function showTitle(){
   $('title').hidden=false;
   $('title').querySelector('.bgv').innerHTML=roomSVG({noflick:true});
-  const st=$('start');st.textContent=Object.keys(S.done).length?'つづきから':'はじめる';
-  st.onclick=()=>{$('title').hidden=true;enterChapter(S.cur)};
+  [[1,'start'],[2,'start2']].forEach(([n,id])=>{
+    const b=$(id),started=Object.keys(loadSave(n).done).length>0;
+    b.innerHTML=`第${n===1?'一':'二'}話　${EPS[n].title}<small>${started?'つづきから':'はじめる'}</small>`;
+    b.onclick=()=>{setEp(n);$('title').hidden=true;enterChapter(S.cur)};
+  });
 }
 
 // ===== エンディング =====
-function endingHTML(){
+function ending1(){
   return `<div class="ending">
    <div class="eyebrow">解決</div>
    <h2>招かれた者</h2>
@@ -1261,12 +1815,14 @@ function endingHTML(){
    </div>
    <div class="teaser"><div class="eyebrow" style="color:#8fa4c9">次の事件</div><div class="t">第二話「不在証明」</div>
     <p>すべてのログが、透さんが犯人だと言っている。ならば、嘘をついているのは誰か。</p></div>
-   <p class="cap">試作版はここまでです。</p>
-   <button type="button" class="back" id="endBack">デスクトップに戻る</button></div>`;
+   <div class="endbtns"><button type="button" class="back go2" id="toEp2">第二話「不在証明」へ</button><button type="button" class="back" id="endBack">デスクトップに戻る</button></div></div>`;
 }
 function showEnding(){
-  const e=$('endov');e.innerHTML=endingHTML();e.hidden=false;e.scrollTop=0;
+  const e=$('endov');e.innerHTML=EPS[EP].ending();e.hidden=false;e.scrollTop=0;
   $('endBack').onclick=()=>{e.hidden=true};
+  // 第一話の終わりからは第二話へ、第二話の終わりからはタイトルへ進める
+  if($('toEp2'))$('toEp2').onclick=()=>{e.hidden=true;setEp(2);enterChapter(S.cur)};
+  if($('endTitle'))$('endTitle').onclick=()=>{e.hidden=true;showTitle()};
 }
 
 // ===== 起動 =====
@@ -1288,6 +1844,5 @@ document.addEventListener('focusout',()=>{
   // iPhone はキーボードを出すとページ全体をずらし、閉じても戻さないことがある。ずれたままだとタップ位置が合わなくなるので戻す
   if(window.scrollY)window.scrollTo(0,0);
 });
-if(!unlocked(S.cur))S.cur=0;
 showTitle();
 </script>
