@@ -15,7 +15,17 @@ d.getElementById('start').click();
 console.log('narr:',d.querySelector('#narr .who').textContent,'| windows:',[...d.querySelectorAll('.win')].map(x=>x.dataset.win).join(','));
 console.log(txt(0,'toru'));txt(0,'ghostwire');next();
 console.log('chat badge:',!!d.querySelector('#icons [data-app=chat] .badge'));open('chat');console.log('chat badge after open:',!!d.querySelector('#icons [data-app=chat] .badge'));
-console.log(mu(0,[0,3]));mu(0,[0,1,2]);console.log(txt(1,'渋谷'));txt(1,'月見台二丁目');next();
+// ヒントは問題ごと。開いても入力途中の答えは消えない
+const hintBtn=()=>note().querySelector('[data-hint]');
+note().querySelector('.opts input').checked=true;hintBtn().click();hintBtn().click();
+const hintOk=note().querySelectorAll('.hint').length===2&&!hintBtn()&&note().querySelector('.opts input').checked;
+console.log('hints:',hintOk?'ok':'NG');
+console.log(mu(0,[0,3]));mu(0,[0,1,2]);console.log('next step hints:',note().querySelectorAll('.hint').length,'/',hintBtn().textContent);
+console.log(txt(1,'渋谷'));txt(1,'月見台二丁目');next();
+// 配信の録画: 左右反転で透が一言反応し、語りに差しこまれる。再生は始めて止められる（音は jsdom では鳴らない）
+d.getElementById('lvflip').click();d.getElementById('lvplay').click();d.getElementById('lvplay').click();
+const liveOk=d.querySelector('#live svg').style.transform==='scaleX(-1)'&&/左右が逆/.test(d.querySelector('#narr .txt').textContent+NRtext());
+console.log('live:',liveOk?'ok':'NG');
 open('map');console.log('map pins',d.querySelectorAll('.pin').length);
 const inp=d.getElementById('mq');inp.value='ランドリー';inp.dispatchEvent(new w.Event('input'));console.log('results',d.querySelectorAll('#mres button').length);
 d.querySelector('#mres button').click();console.log(d.querySelector('.placecard .ttl').textContent);
@@ -27,9 +37,14 @@ txt(0,'kuga-housing.jp');console.log(txt(1,'301'));txt(1,'302');next();
 open('hash');const rows=d.querySelectorAll('#htab tr.pick');rows[1].click();rows[7].click();console.log(d.getElementById('hcmp').textContent);
 console.log(txt(0,'10/09'));txt(0,'10月12日');ch(1,1);open('video');txt(2,'腕時計');next();
 open('seam');d.querySelector('.seg button[data-v="d"]').click();console.log(d.getElementById('dcap').textContent);
-console.log(txt(0,'黒澄レイ'));txt(0,'久我圭吾');console.log(ch(1,1));ch(1,0);ch(2,1);console.log(ch(3,1));ch(3,2);ch(4,3);console.log(txt(5,'天井裏'));txt(5,'押入れ');next();
+console.log(txt(0,'黒澄レイ'));txt(0,'久我圭吾');console.log(ch(1,1));ch(1,0);ch(2,1);console.log(ch(3,1));ch(3,2);ch(4,3);
+// 対決で3回まちがえると、最初の言い分からやり直しになる
+txt(5,'天井裏');const duelOk=!!note().querySelector('form[data-s="1"]')&&d.querySelector('#narr .who').textContent==='久我';
+console.log('duel reset:',duelOk?'ok':'NG');
+ch(1,0);ch(2,1);ch(3,2);ch(4,3);txt(5,'押入れ');next();
 
 const ok1=d.querySelector('.ending h2')?.textContent==='招かれた者';
+console.log(d.querySelector('.ending .endbtns').previousElementSibling.textContent);
 console.log('第一話:',ok1?'クリア':'終章に届かない');
 
 // 第二話: エンディングからタイトルに戻って始める
@@ -53,7 +68,9 @@ const ok2=d.querySelector('.ending h2')?.textContent==='不在証明';
 console.log('第二話:',ok2?'クリア':'終章に届かない');
 
 // 両方の終章まで進めてスクリプトエラーがなければ成功
-const ok=ok1&&ok2&&errs.length===0;
+const ok=ok1&&ok2&&hintOk&&duelOk&&liveOk&&errs.length===0;
 console.log(ok?'OK: 全章クリア':'NG: 終章に到達しないか、エラーが出た','errors:',errs);
 process.exit(ok?0:1);
+// 語りは一文字ずつ出るので、出しきってから読む（語りをクリックすると全文が出る）
+function NRtext(){d.getElementById('narr').click();return d.querySelector('#narr .txt').textContent}
 function t2(c){const t=d.getElementById('tin');t.value=c;d.getElementById('tform').dispatchEvent(new w.Event('submit',{cancelable:true}))}

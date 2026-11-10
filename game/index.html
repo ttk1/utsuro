@@ -273,7 +273,8 @@ tr.pick:hover td{background:var(--surface2)}
 .feedback.bad{color:var(--red)}
 .done-step{padding:10px 14px;border-left:3px solid var(--ok);background:var(--ok-bg);font-size:13.5px}
 .done-step b{color:var(--ok)}
-.hints{display:flex;flex-direction:column;gap:6px}
+.hints{display:flex;flex-direction:column;align-items:flex-start;gap:6px;margin-top:10px}
+.hints:empty{display:none}
 .hint{font-size:13px;color:var(--muted);background:var(--bg);padding:8px 10px;border:1px dashed var(--line)}
 .solved{padding:14px 16px;border-left:3px solid var(--ok);background:var(--ok-bg);display:flex;flex-direction:column;gap:8px}
 .solved p{margin:0}
@@ -297,6 +298,9 @@ tr.pick:hover td{background:var(--surface2)}
 .zoomable.zoom .stream svg{transform:scale(2.6)}
 @media (prefers-reduced-motion:no-preference){
   .flick{animation:flick 6s infinite}
+  /* 貨物が通るあいだ、配信の画面をかすかに揺らす */
+  #live.rumble .stream{animation:shake .22s linear infinite}
+  @keyframes shake{25%{transform:translate(.7px,.4px)}75%{transform:translate(-.6px,-.4px)}}
   @keyframes flick{0%,96%,100%{opacity:1}97%{opacity:.75}98%{opacity:1}99%{opacity:.85}}
 }
 @media (prefers-reduced-motion:reduce){#narr .more,.toast,.bubble.typing i,.done-step.just,.solved{animation:none}.zoomable .stream svg{transition:none}}
@@ -378,89 +382,195 @@ tr.pick:hover td{background:var(--surface2)}
 <div id="endov" class="over" hidden></div>
 
 <script>
-// ===== 部屋の絵 =====
+// ===== 絵の共通部品 =====
+// カメラの映像は、部屋や街を 3D の座標（m）で置き、カメラから見た位置に写して描く（遠近が揃う）。
+// camera() は点 (x=右, y=奥, z=上) を画面の座標に写す関数を返す。f は焦点距離（px）で、小さいほど広角
 let svgN=0;
+function camera(eye,at,f){
+  const sub=(a,b)=>a.map((v,i)=>v-b[i]),dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2],unit=a=>{const l=Math.hypot(...a);return a.map(v=>v/l)};
+  const fw=unit(sub(at,eye)),rt=unit([fw[1],-fw[0],0]),up=[rt[1]*fw[2]-rt[2]*fw[1],rt[2]*fw[0]-rt[0]*fw[2],rt[0]*fw[1]-rt[1]*fw[0]];
+  return (x,y,z)=>{const d=sub([x,y,z],eye),w=dot(d,fw);return [320+f*dot(d,rt)/w,180-f*dot(d,up)/w]};
+}
+// 3D の点から SVG の部品を作る道具。P は camera() の返す関数、ex はカメラの x
+function draw3d(P,ex=-1e9){
+  const mx=(a,b,c)=>`matrix(${[b[0]-a[0],b[1]-a[1],c[0]-a[0],c[1]-a[1],a[0],a[1]].map(v=>v.toFixed(4)).join(' ')})`;
+  const pg=(pts,attr)=>`<polygon points="${pts.map(p=>P(...p).map(v=>v.toFixed(1)).join(',')).join(' ')}" ${attr}/>`;
+  return {
+    pg,
+    // 直方体。カメラは手前の上にある前提で、見える三面（上・横・手前）を描く。横はカメラ（x=ex）に近い側の面。
+    // 色は fill などの属性で渡し、描かない面は null
+    box:(x0,y0,z0,x1,y1,z1,top,side,front)=>{const x=x1<ex?x1:x0;
+      return (top==null?'':pg([[x0,y0,z1],[x1,y0,z1],[x1,y1,z1],[x0,y1,z1]],top))
+      +(side==null?'':pg([[x,y0,z0],[x,y1,z0],[x,y1,z1],[x,y0,z1]],side))+(front==null?'':pg([[x0,y0,z0],[x1,y0,z0],[x1,y0,z1],[x0,y0,z1]],front))},
+    // 平面に貼りついた小さなもの（文字など）を置く行列。原点 o から u が右、v が下で、中は cm で描く
+    plane:(o,u,v)=>mx(P(...o),P(...o.map((n,i)=>n+u[i]/100)),P(...o.map((n,i)=>n+v[i]/100))),
+    // 床の (x,y) に立つ背の高さ h の人や柱を置く行列。原点は足もと、上が -y で、中は cm で描く
+    stand:(x,y,h)=>{const a=P(x,y,0),b=P(x,y,h),c=P(x+.01,y,0);return mx(a,c,[a[0]+(a[0]-b[0])/(h*100),a[1]+(a[1]-b[1])/(h*100)])},
+  };
+}
+// 安いカメラの映像らしく見せる仕上げ。わずかにぼかし、壁や床のむらと、センサーのノイズを足す。
+// 乱数の種は固定している（同じ絵は毎回同じ画素になる。第一話の「差分」がこれに頼っている）
+// フィルタの範囲は画面の大きさで決め打ちする（中身の外接矩形に合わせると、画面の外まで伸びる壁や床のぶんまで計算して重くなる）
+const camFx=(id,grain=.13,blur=.45)=>{const box='filterUnits="userSpaceOnUse" x="0" y="0" width="640" height="360" color-interpolation-filters="sRGB"';
+  return `<filter id="${id}" ${box}><feGaussianBlur stdDeviation="${blur}"/></filter>
+  <filter id="${id}m" ${box}><feTurbulence type="fractalNoise" baseFrequency=".012 .02" numOctaves="3" seed="4"/><feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .8 0 0 0 -.3"/></filter>
+  <filter id="${id}n" ${box}><feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="1" seed="7"/><feColorMatrix type="matrix" values=".42 .14 .14 0 0 .14 .42 .14 0 0 .14 .14 .42 0 0 0 0 0 0 ${grain}"/></filter>`};
+// camFx のむらとノイズを絵の上に重ねる
+const camNoise=id=>`<rect width="640" height="360" filter="url(#${id}m)"/><rect width="640" height="360" filter="url(#${id}n)"/>`;
+// 画面の四隅が暗く落ちるレンズ
+const vignette=(id,a=.75)=>`<radialGradient id="${id}" cx="50%" cy="48%" r="72%"><stop offset="50%" stop-color="#000" stop-opacity="0"/><stop offset="100%" stop-color="#000" stop-opacity="${a}"/></radialGradient>`;
+// 壁掛けの丸い時計（半径 16.5cm、3時35分）。mirror なら左右が反転した映像用に、数字を鏡文字にして針も逆向きにする
+const wallClock=(face,mirror)=>{const m=mirror?-1:1;
+  return `<circle cx="-3" cy="2.5" r="17" fill="#000" opacity=".4"/>
+    <circle r="16.5" fill="rgb(30,27,25)"/><circle r="14.6" fill="${face}"/>
+    ${Array.from({length:12},(_,i)=>`<line y1="-13.6" y2="${i%3?-12.4:-11.6}" stroke="rgb(52,50,46)" stroke-width="${i%3?.5:.9}" transform="rotate(${i*30})"/>`).join('')}
+    <g transform="scale(${m} 1)" font-family="IBM Plex Mono, monospace" font-weight="500" font-size="6.6" fill="rgb(34,33,31)" text-anchor="middle"><text y="-5.6">12</text><text x="8.4" y="2.3">3</text><text y="10.4">6</text><text x="-8.4" y="2.3">9</text></g>
+    <line x1="0" y1="0" x2="${-5.6*m}" y2="9.7" stroke="rgb(24,23,22)" stroke-width="1.1" stroke-linecap="round"/>
+    <line x1="0" y1="0" x2="${7*m}" y2="2.2" stroke="rgb(24,23,22)" stroke-width="1.6" stroke-linecap="round"/>
+    <circle r="1.1" fill="rgb(24,23,22)"/>
+    <path d="M-11 -7 A13 13 0 0 1 2 -12.6 A16 16 0 0 0 -11 -7Z" fill="#fff" opacity=".1"/>`};
+
+// ===== 部屋の絵 =====
+// うつろ放送の和室。奥の壁の向かいの、天井ぎわから見下ろす。映像は左右が反転しているので、時計と看板は鏡文字で描く
 function roomSVG(o={}){
-  const id='vg'+(svgN++);
-  const k=o.dark?0.38:1;
-  const c=(r,g,b)=>`rgb(${Math.round(r*k)},${Math.round(g*k)},${Math.round(b*k)})`;
-  // 10/11 の二人。壁（約 11）よりわずかに明るいだけの色で描き、明るさ補正をかけて初めて形がわかるようにする
-  // 奥の男（久我）は窓の外の踏切に頭が重ならない位置に立つ。右手首に腕時計、手前の遼は胸の前でスマホを握る
-  const fig=o.figures?`
-    <g filter="url(#${id}b)" fill="rgb(13,13,16)">
-      <g transform="translate(36 0)">
-        <ellipse cx="436" cy="137" rx="15" ry="19"/>
-        <path d="M429 152 L443 152 L444 160 Q458 162 465 174 Q470 190 466 236 L471 330 L403 330 L408 236 Q404 190 409 174 Q416 162 428 160 Z"/>
-        <path d="M411 176 Q400 214 404 254 L411 254 Q410 218 419 186 Z"/>
-        <path d="M461 172 Q476 198 482 232 L490 230 Q483 194 467 168 Z"/>
-        <ellipse cx="487.5" cy="244" rx="4.4" ry="7" transform="rotate(-14 487.5 244)"/>
-      </g>
-      <ellipse cx="290" cy="162" rx="14" ry="17"/>
-      <path d="M284 176 L296 176 L297 183 Q309 186 315 197 Q319 212 316 250 L320 330 L260 330 L264 250 Q261 212 265 197 Q271 186 283 183 Z"/>
-      <path d="M267 197 Q258 228 262 262 L269 262 Q267 232 274 206 Z"/>
-      <path d="M311 197 Q322 216 314 236 L303 240 L302 233 L307 230 Q311 218 304 205 Z"/>
-    </g>
-    <circle cx="300" cy="230" r="13" fill="url(#${id}p)"/>
-    <g transform="rotate(-12 300 230)">
-      <rect x="295.5" y="223" width="9" height="15" rx="1.8" fill="rgb(12,12,14)"/>
-      <rect x="296.6" y="224.4" width="6.8" height="12" rx=".8" fill="rgb(24,30,40)"/>
-      <rect x="297.4" y="226" width="5" height="1" fill="rgb(30,38,50)"/><rect x="297.4" y="228.4" width="3.6" height="1" fill="rgb(30,38,50)"/>
-    </g>
-    <ellipse cx="303.5" cy="236.5" rx="3.6" ry="2.4" fill="rgb(13,13,16)" transform="rotate(-25 303.5 236.5)"/>
-    <ellipse cx="295.6" cy="231" rx="1.6" ry="3.2" fill="rgb(13,13,16)"/>
-    <g transform="translate(36 0)">
-      <g transform="rotate(-20 485.5 232)">
-        <rect x="478" y="229.1" width="15" height="5.8" rx="1.4" fill="rgb(21,21,23)"/>
-        ${[480.4,482.6,488.4,490.6].map(x=>`<line x1="${x}" y1="229.3" x2="${x}" y2="234.7" stroke="rgb(28,28,30)" stroke-width=".5"/>`).join('')}
-      </g>
-      <circle cx="485.5" cy="232" r="5" fill="rgb(16,16,19)" stroke="rgb(29,28,26)" stroke-width="1.4"/>
-      <circle cx="485.5" cy="232" r="3.3" fill="rgb(21,22,25)"/>
-      <path d="M485.5 232 L485.5 229.6 M485.5 232 L487.2 232.8" stroke="rgb(30,30,29)" stroke-width=".55"/>
-      <ellipse cx="483.6" cy="230" rx="1.4" ry=".8" fill="rgb(48,46,39)"/>
-    </g>`:'';
-  // 暗い映像のノイズ。明るさを上げると浮き出る
-  const grain=o.dark?`<rect width="640" height="360" filter="url(#${id}n)" opacity=".09"/>`:'';
-  const gap=o.seam?14:3;
-  const seam=`<rect x="${152-gap/2}" y="128" width="${gap}" height="150" fill="${c(8,8,10)}"/>`+(o.seam?`<path d="M149 214 q3 -6 6 0 q-1 8 -6 10z" fill="${c(120,116,104)}"/>`:'');
-  const fl=o.noflick?'':'flick';
+  const id='vg'+(svgN++),W=3.64,D=2.73;
+  const P=camera([2.4,.1,2.3],[1.96,D,.78],380),{pg,plane,stand}=draw3d(P);
+  const wall=(x0,z0,x1,z1,attr)=>pg([[x0,D,z0],[x1,D,z0],[x1,D,z1],[x0,D,z1]],attr); // 奥の壁の上の長方形
+  const flr=(x0,y0,x1,y1,attr)=>pg([[x0,y0,0],[x1,y0,0],[x1,y1,0],[x0,y1,0]],attr);
+  const onWall=(x,z)=>plane([x,D,z],[1,0,0],[0,0,-1]);
+  const at=(x,y,z)=>P(x,y,z).map(v=>v.toFixed(1));
+  const WOOD='rgb(44,36,28)',EDGE='rgb(66,54,41)';
+  // 畳は六枚。縁（へり）は長い辺に付き、向きの違う畳は光り方が違って見える
+  const U=.91,heri='fill="rgb(24,27,22)"';
+  const mats=[[0,0,2,1],[2,0,3,2],[3,0,4,2],[0,1,1,3],[1,1,2,3],[2,2,4,3]].map(m=>{
+    const [x0,y0,x1,y1]=m.map(v=>v*U),h=x1-x0>y1-y0,e=.028;
+    return flr(x0,y0,x1,y1,`fill="${h?'rgb(80,80,58)':'rgb(68,70,50)'}" stroke="rgb(40,42,32)" stroke-width=".7"`)
+      +(h?flr(x0,y0,x1,y0+e,heri)+flr(x0,y1-e,x1,y1,heri):flr(x0,y0,x0+e,y1,heri)+flr(x1-e,y0,x1,y1,heri))}).join('');
+  // 襖。2枚とも同じ大きさで描き、合わせ目の隙間は上から重ねる（隙間のほかは 1 画素も変わらないようにするため）
+  const fus=(x0,x1,z0,z1,paper)=>wall(x0,z0,x1,z1,'fill="rgb(22,19,17)"')+wall(x0+.024,z0+.024,x1-.024,z1-.024,`fill="${paper}"`);
+  const gap=o.seam?.13:.007;
+  const oshiire=fus(.1,.8,.015,1.76,`url(#${id}p)`)+fus(.8,1.5,.015,1.76,`url(#${id}p)`)
+    +fus(.1,.8,1.84,2.38,'rgb(92,93,82)')+fus(.8,1.5,1.84,2.38,'rgb(98,98,86)')
+    +wall(.1,.015,1.5,1.76,`fill="url(#${id}q)"`)
+    +`<g transform="${onWall(.8,.86)}">${[-9,9].map(x=>`<circle cx="${x}" r="3.2" fill="rgb(34,28,24)"/><circle cx="${x}" cy=".3" r="2" fill="rgb(16,14,13)"/>`).join('')}</g>`
+    +wall(.8-gap/2,.015,.8+gap/2,1.76,'fill="rgb(5,5,6)"')
+    +(o.seam?`<g transform="${onWall(.8,1.02)}"><ellipse cx=".2" cy="0" rx="1.5" ry="5.6" transform="rotate(-14 .2 0)" fill="rgb(146,137,121)"/><ellipse cx="2.3" cy="5.4" rx="1.3" ry="4.6" transform="rotate(-10 2.3 5.4)" fill="rgb(98,92,82)"/></g>`:'');
+  // 時計（鏡文字。3 が左、9 が右、針は 3時35分を鏡に映した向き）
+  const clock=`<g transform="${onWall(1.83,1.57)}">${wallClock(`url(#${id}c)`,true)}</g>`;
+  // 窓の外。三階から通りを見下ろすので空は見えない。向かいのランドリーの看板と、その左に踏切
+  const glass=[[2.115,2.79],[2.83,3.505]],wc=onWall(2.8,1.3);
+  const outside=`<g clip-path="url(#${id}w)"><g transform="${wc}">
+    <rect x="-75" y="-48" width="150" height="96" fill="rgb(10,12,18)"/>
+    ${[[-75,-48,26,24],[-46,-48,22,19],[-20,-48,30,22],[14,-48,26,18],[44,-48,31,21]].map(([x,y,w,h])=>`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="rgb(17,19,26)"/><rect x="${x}" y="${y+h-1}" width="${w}" height="1" fill="rgb(24,26,32)"/>`).join('')}
+    ${[[-68,-40],[-12,-37],[-4,-37],[52,-38],[22,-42]].map(([x,y])=>`<rect x="${x}" y="${y}" width="3" height="2.2" fill="rgb(126,112,70)"/>`).join('')}
+    <polygon points="-46,-27 66,-27 72,-14 -42,-14" fill="rgb(25,27,32)"/>
+    <rect x="-42" y="-14" width="114" height="37" fill="rgb(40,40,41)"/>
+    <rect x="-39" y="-10.5" width="84" height="17" fill="rgb(54,45,24)"/>
+    <ellipse cx="3" cy="-2" rx="62" ry="22" fill="url(#${id}g)"/>
+    <rect x="-37" y="10" width="80" height="12" fill="rgb(132,144,128)"/>
+    ${[-37,-17,3,23,42].map(x=>`<rect x="${x}" y="10" width="1.2" height="12" fill="rgb(38,40,40)"/>`).join('')}
+    ${[-30,-23,-10,-3,10,17,30,37].map(x=>`<circle cx="${x}" cy="17" r="2.3" fill="rgb(92,104,100)"/>`).join('')}
+    <rect x="-75" y="23" width="150" height="25" fill="rgb(21,22,25)"/>
+    <polygon points="-40,23 46,23 58,33 -52,33" fill="url(#${id}s)"/>
+    <path d="M-75 38 H75" stroke="rgb(96,96,86)" stroke-width="1" stroke-dasharray="10 8"/>
+    <path d="M-75 27 L-60 48 M-67 23 L-49 48" stroke="rgb(58,60,64)" stroke-width=".9"/>
+    <path d="M-75 -30 Q-20 -22 75 -33 M-75 -26 Q-20 -18 75 -29" stroke="rgb(4,4,6)" stroke-width=".6" fill="none"/>
+    <rect x="-55.8" y="-22" width="1.7" height="48" fill="rgb(94,95,98)"/>
+    <path d="M-62 -29 L-48 -19 M-48 -29 L-62 -19" stroke="rgb(196,176,58)" stroke-width="2.5"/>
+    <path d="M-62 -29 L-48 -19 M-48 -29 L-62 -19" stroke="rgb(22,20,14)" stroke-width="2.5" stroke-dasharray="1.8 3.4" stroke-dashoffset="-1.7"/>
+    <rect x="-61.5" y="-14.5" width="13" height="5.6" rx="2.6" fill="rgb(14,14,15)"/>
+    <circle cx="-58.7" cy="-11.7" r="2.1" fill="rgb(112,28,26)"/><circle cx="-51.3" cy="-11.7" r="2.1" fill="rgb(112,28,26)"/>
+  </g></g>`;
+  const pane=(x0,x1)=>[[x0,D,.89],[x1,D,.89],[x1,D,1.715],[x0,D,1.715]];
+  const cur=(x,w)=>`<g transform="${onWall(x,1.86)}"><path d="M0 0 H${w} V112 q${-w/6} 2.4 ${-w/3} 0 t${-w/3} 0 t${-w/3} 0 Z" fill="url(#${id}k)"/><path d="M0 0 H${w} V112 H0 Z" fill="url(#${id}t)"/></g>`;
+  const windowParts=wall(2.04,.8,3.58,.835,`fill="${EDGE}"`)+wall(2.06,.835,3.56,1.76,`fill="${WOOD}"`)+wall(2.09,.865,3.53,1.74,'fill="rgb(74,78,82)"')
+    +outside+glass.map(g=>pg(pane(...g),`fill="url(#${id}r)"`)).join('')
+    +wall(2.02,1.845,3.64,1.865,'fill="rgb(82,82,78)"')+cur(1.99,17)+cur(3.4,22);
+  const sign=`<g clip-path="url(#${id}w)"><g transform="${wc}"><g transform="translate(3 2.4) scale(-1 1)" class="${o.noflick?'':'flick'}" text-anchor="middle" font-family="Zen Kaku Gothic New, sans-serif" font-weight="700" font-size="9.8">
+      <text fill="${o.dark?'rgb(110,86,40)':'#f0c060'}" filter="url(#${id}h)" opacity=".8">ツキミ ランドリー</text>
+      <text fill="${o.dark?'rgb(110,86,40)':'#f3c768'}" filter="url(#${id}i)">ツキミ ランドリー</text></g></g></g>`;
+  // 座布団
+  const zab=(z,attr)=>pg([[-.27,-.27],[.27,-.27],[.27,.27],[-.27,.27]].map(([a,b])=>[1.62+a*.97-b*.24,2.08+a*.24+b*.97,z]),`stroke-linejoin="round" ${attr}`);
+  const zabuton=`<g filter="url(#${id}z)" opacity=".6">${pg([[-.42,-.3],[.24,-.3],[.24,.34],[-.42,.34]].map(([a,b])=>[1.62+a,2.08+b,0]),'fill="#000"')}</g>`
+    +zab(.02,'fill="rgb(46,22,22)" stroke="rgb(46,22,22)" stroke-width="5"')+zab(.075,`fill="url(#${id}a)" stroke="rgb(82,37,35)" stroke-width="4"`)
+    +`<circle cx="${at(1.62,2.08,.07)[0]}" cy="${at(1.62,2.08,.07)[1]}" r="1.6" fill="rgb(40,18,18)"/>`;
+  const dim=.16; // 10/11 の録画は、ふだんの映像をこの割合まで暗くする
+  const mull=wall(2.79,.865,2.83,1.74,`fill="rgb(${[74,78,82].map(v=>Math.round(o.dark?v*dim:v)).join(',')})"`);
+  const [lx,ly]=at(2.9,D-.55,0),[gx,gy]=at(2.8,D,1.3);
   return `<svg viewBox="0 0 640 360" role="img" aria-label="うつろ放送の配信画面。薄暗い和室">
-  <defs><radialGradient id="${id}" cx="50%" cy="50%" r="70%"><stop offset="60%" stop-color="#000" stop-opacity="0"/><stop offset="100%" stop-color="#000" stop-opacity=".7"/></radialGradient>
-   <radialGradient id="${id}p"><stop offset="0%" stop-color="rgb(30,38,52)" stop-opacity=".35"/><stop offset="100%" stop-color="rgb(30,38,52)" stop-opacity="0"/></radialGradient>
-   <filter id="${id}b" x="-10%" y="-10%" width="120%" height="120%"><feGaussianBlur stdDeviation=".9"/></filter>
-   <filter id="${id}n"><feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="2" seed="11"/><feColorMatrix type="saturate" values="0"/></filter></defs>
-  <rect width="640" height="360" fill="${c(28,30,40)}"/>
-  <polygon points="0,290 640,290 640,360 0,360" fill="${c(44,46,34)}"/>
-  ${[0,1,2,3,4].map(i=>`<line x1="${i*160}" y1="290" x2="${i*160-40}" y2="360" stroke="${c(30,32,24)}" stroke-width="2"/>`).join('')}
-  <line x1="0" y1="290" x2="640" y2="290" stroke="${c(20,20,24)}" stroke-width="3"/>
-  <rect x="80" y="118" width="144" height="172" fill="${c(56,52,44)}"/>
-  <rect x="92" y="128" width="60" height="150" fill="${c(170,164,146)}"/>
-  <rect x="152" y="128" width="62" height="150" fill="${c(166,160,142)}"/>
-  ${seam}
-  <circle cx="142" cy="206" r="3" fill="${c(70,64,52)}"/><circle cx="162" cy="206" r="3" fill="${c(70,64,52)}"/>
-  <g transform="translate(300 86)">
-    <circle r="26" fill="${c(200,196,184)}" stroke="${c(60,58,52)}" stroke-width="3"/>
-    <g transform="scale(-1 1)" font-family="IBM Plex Mono, monospace" font-size="10" fill="${c(40,40,40)}" text-anchor="middle">
-      <text y="-14">12</text><text x="17" y="4">3</text><text y="22">6</text><text x="-17" y="4">9</text>
-    </g>
-    <line x1="0" y1="0" x2="8" y2="14" stroke="${c(30,30,30)}" stroke-width="2"/>
-    <line x1="0" y1="0" x2="-10" y2="3" stroke="${c(30,30,30)}" stroke-width="2.5"/>
+  <defs>${camFx(id+'f')}${vignette(id+'v')}
+   <clipPath id="${id}w">${glass.map(g=>pg(pane(...g),'')).join('')}</clipPath>
+   <filter id="${id}h" x="-20%" y="-150%" width="140%" height="400%"><feGaussianBlur stdDeviation="1.6"/></filter>
+   <filter id="${id}i"><feGaussianBlur stdDeviation=".28"/></filter>
+   <filter id="${id}z" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="7"/></filter>
+   <filter id="${id}b" x="-10%" y="-10%" width="120%" height="120%"><feGaussianBlur stdDeviation="1.3"/></filter>
+   <linearGradient id="${id}u" gradientUnits="userSpaceOnUse" x1="0" y1="-185" x2="0" y2="0"><stop offset="0" stop-color="rgb(12,12,12)"/><stop offset=".45" stop-color="rgb(12,12,12)" stop-opacity=".92"/><stop offset=".9" stop-color="rgb(12,12,12)" stop-opacity="0"/></linearGradient>
+   <linearGradient id="${id}p" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="rgb(100,102,92)"/><stop offset=".5" stop-color="rgb(134,133,119)"/><stop offset="1" stop-color="rgb(112,108,94)"/></linearGradient>
+   <linearGradient id="${id}q" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#000" stop-opacity=".34"/><stop offset="1" stop-color="#000" stop-opacity="0"/></linearGradient>
+   <linearGradient id="${id}t" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#000" stop-opacity=".5"/><stop offset=".7" stop-color="#000" stop-opacity="0"/></linearGradient>
+   <linearGradient id="${id}k" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="13" y2="1.2" spreadMethod="repeat"><stop offset="0" stop-color="rgb(50,50,46)"/><stop offset=".22" stop-color="rgb(74,72,64)"/><stop offset=".4" stop-color="rgb(46,46,43)"/><stop offset=".62" stop-color="rgb(70,69,61)"/><stop offset=".8" stop-color="rgb(58,57,52)"/><stop offset="1" stop-color="rgb(50,50,46)"/></linearGradient>
+   <linearGradient id="${id}r" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="rgb(170,190,200)" stop-opacity=".1"/><stop offset=".5" stop-color="rgb(170,190,200)" stop-opacity="0"/></linearGradient>
+   <linearGradient id="${id}s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="rgb(150,156,132)" stop-opacity=".5"/><stop offset="1" stop-color="rgb(150,156,132)" stop-opacity="0"/></linearGradient>
+   <linearGradient id="${id}a" x1="1" y1="0" x2="0" y2="1"><stop offset="0" stop-color="rgb(104,48,44)"/><stop offset="1" stop-color="rgb(66,29,29)"/></linearGradient>
+   <radialGradient id="${id}c" cx="58%" cy="42%" r="70%"><stop offset="0" stop-color="rgb(168,166,154)"/><stop offset="1" stop-color="rgb(122,121,112)"/></radialGradient>
+   <radialGradient id="${id}g"><stop offset="0" stop-color="rgb(240,190,90)" stop-opacity=".34"/><stop offset="1" stop-color="rgb(240,190,90)" stop-opacity="0"/></radialGradient>
+   <radialGradient id="${id}l" gradientUnits="userSpaceOnUse" cx="${lx}" cy="${ly}" r="380"><stop offset="0" stop-color="rgb(255,236,180)" stop-opacity=".2"/><stop offset=".35" stop-color="rgb(120,110,90)" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".62"/></radialGradient>
+   <radialGradient id="${id}o" gradientUnits="userSpaceOnUse" cx="${gx}" cy="${gy}" r="210"><stop offset="0" stop-color="rgb(226,206,150)" stop-opacity=".2"/><stop offset="1" stop-color="rgb(226,206,150)" stop-opacity="0"/></radialGradient>
+   <radialGradient id="${id}e"><stop offset="0" stop-color="rgb(30,38,52)" stop-opacity=".4"/><stop offset="1" stop-color="rgb(30,38,52)" stop-opacity="0"/></radialGradient>
+  </defs>
+  <g filter="url(#${id}f)">
+  <rect width="640" height="360" fill="rgb(14,15,15)"/>
+  ${mats}${flr(0,0,W,D,`fill="url(#${id}l)"`)}
+  ${pg([[0,D-.3,0],[W,D-.3,0],[W,D,0],[0,D,0]],`fill="url(#${id}t)" transform="rotate(180 320 ${at(1.8,D-.15,0)[1]})" opacity="0"`)}
+  ${pg([[0,0,0],[0,D,0],[0,D,2.4],[0,0,2.4]],'fill="rgb(50,54,45)"')}${pg([[0,0,1.76],[0,D,1.76],[0,D,1.83],[0,0,1.83]],`fill="${WOOD}"`)}
+  ${pg([[W,1,0],[W,D,0],[W,D,2.4],[W,1,2.4]],'fill="rgb(34,37,33)"')}${pg([[W,1,1.76],[W,D,1.76],[W,D,1.83],[W,1,1.83]],`fill="${WOOD}"`)}
+  ${wall(0,0,W,2.4,'fill="rgb(52,56,47)"')}${wall(0,0,W,2.4,`fill="url(#${id}o)"`)}${wall(0,0,W,2.4,`fill="url(#${id}t)"`)}
+  ${wall(.1,0,1.5,2.4,'fill="rgb(30,25,20)"')}${oshiire}
+  ${wall(0,1.76,W,1.835,`fill="${WOOD}"`)}${wall(0,1.76,W,1.772,`fill="${EDGE}"`)}
+  ${[[0,.1],[1.5,1.6],[3.56,W]].map(([a,b])=>wall(a,0,b,2.4,`fill="${WOOD}"`)+wall(b-.014,0,b,2.4,`fill="${EDGE}"`)).join('')}
+  ${wall(0,0,W,.05,'fill="#000" opacity=".35"')}
+  ${clock}${windowParts}${zabuton}
+  ${o.dark?`<rect width="640" height="360" fill="#000" opacity="${1-dim}"/>`:''}
+  ${o.figures?roomFigures(id,stand):''}
+  <rect width="640" height="360" fill="url(#${id}v)"/>
   </g>
-  <rect x="408" y="70" width="190" height="150" fill="${c(10,12,22)}" stroke="${c(70,66,58)}" stroke-width="6"/>
-  <line x1="503" y1="70" x2="503" y2="220" stroke="${c(70,66,58)}" stroke-width="4"/>
-  <g>
-    <rect x="433" y="128" width="3" height="66" fill="${c(90,90,96)}"/>
-    <line x1="424" y1="122" x2="446" y2="140" stroke="${c(210,200,60)}" stroke-width="4"/>
-    <line x1="446" y1="122" x2="424" y2="140" stroke="${c(210,200,60)}" stroke-width="4"/>
-    <circle cx="427" cy="152" r="5" fill="${c(120,30,30)}"/><circle cx="443" cy="152" r="5" fill="${c(120,30,30)}"/>
-  </g>
-  <rect x="464" y="152" width="122" height="32" fill="${c(46,40,24)}"/>
-  <g transform="translate(525 174) scale(-1 1)"><text text-anchor="middle" font-family="Zen Kaku Gothic New, sans-serif" font-weight="700" font-size="16" fill="${o.dark?'rgb(110,86,40)':'#f0c060'}" class="${fl}">ツキミ ランドリー</text></g>
-  <rect x="412" y="196" width="182" height="3" fill="${c(60,60,70)}"/>
-  <ellipse cx="330" cy="318" rx="60" ry="14" fill="${c(80,40,40)}"/>
-  ${fig}
-  ${grain}
-  <rect width="640" height="360" fill="url(#${id})"/>
+  ${camNoise(id+'f')}${sign}${mull}
 </svg>`;
+}
+// 10/11 の録画の二人。壁（明るさ 9 前後）よりわずかに明るいだけの色で描き、明るさ補正をかけて初めて形がわかるようにする。
+// 手前の遼は胸の前でスマホを握る。奥の男（久我）は窓のそばに立ち、画面で右側の手首に腕時計。頭は窓の外の踏切に重ねない
+function roomFigures(id,stand){
+  const B='rgb(12,12,12)',U=`url(#${id}u)`; // 足もとは床の暗さに溶ける
+  return `<g transform="${stand(2.06,1.86,1.68)}">
+    <g filter="url(#${id}b)" fill="${U}" stroke="${U}" stroke-linecap="round" stroke-linejoin="round">
+      <ellipse cx="0" cy="-156" rx="9.4" ry="11.6" stroke="none"/>
+      <path stroke="none" d="M-5 -147 L5 -147 L6 -143 Q18 -142 21 -134 Q24 -120 22 -100 L19 -84 L17 -40 L15 0 L3 0 L1 -72 L-1 -72 L-3 0 L-15 0 L-17 -40 L-19 -84 L-22 -100 Q-24 -120 -21 -134 Q-18 -142 -6 -143 Z"/>
+      <path fill="none" stroke-width="8.5" d="M-20 -133 L-24 -107 L-4 -114 M20 -133 L24 -107 L5 -113"/>
+    </g>
+    <circle cx="1" cy="-118" r="22" fill="url(#${id}e)"/>
+    <g transform="rotate(-10 1 -117)">
+      <rect x="-3" y="-125" width="8" height="15" rx="1.4" fill="rgb(12,12,14)"/>
+      <rect x="-2.1" y="-123.8" width="6.2" height="12.4" rx=".7" fill="rgb(21,26,35)"/>
+      <rect x="-1.2" y="-122" width="4.4" height="1" fill="rgb(31,39,52)"/><rect x="-1.2" y="-119.6" width="3" height="1" fill="rgb(31,39,52)"/>
+    </g>
+    <ellipse cx="5" cy="-111.5" rx="3.3" ry="2.2" fill="${B}" transform="rotate(-25 5 -111.5)"/><ellipse cx="-3.2" cy="-116" rx="1.5" ry="3" fill="${B}"/>
+  </g>
+  <g transform="${stand(3.3,2.36,1.86)}">
+    <g filter="url(#${id}b)" fill="${U}" stroke="${U}" stroke-linecap="round" stroke-linejoin="round">
+      <ellipse cx="0" cy="-173" rx="10" ry="12.6" stroke="none"/>
+      <path stroke="none" d="M-5 -162 L5 -162 L6 -158 Q20 -157 24 -148 Q28 -130 26 -100 L25 -52 L16 -52 L15 0 L3 0 L1 -52 L-1 -52 L-3 0 L-15 0 L-16 -52 L-25 -52 L-26 -100 Q-28 -130 -24 -148 Q-20 -157 -6 -158 Z"/>
+      <path fill="none" stroke-width="9" d="M-23 -146 L-28 -112 L-27 -86 M23 -146 L28 -114 L31 -90"/>
+      <ellipse cx="32" cy="-80" rx="4.4" ry="6.4" stroke="none" transform="rotate(-8 32 -80)"/>
+    </g>
+    <g transform="rotate(-14 31 -88)">
+      <rect x="25.6" y="-90.4" width="10.8" height="4.8" rx="1.2" fill="rgb(21,21,23)"/>
+      ${[27.2,28.8,33.2,34.8].map(x=>`<line x1="${x}" y1="-90.2" x2="${x}" y2="-85.8" stroke="rgb(28,28,30)" stroke-width=".4"/>`).join('')}
+    </g>
+    <circle cx="31" cy="-88" r="3.7" fill="rgb(16,16,19)" stroke="rgb(29,28,26)" stroke-width="1"/>
+    <circle cx="31" cy="-88" r="2.4" fill="rgb(21,22,25)"/>
+    <path d="M31 -88 V-89.8 M31 -88 L32.3 -87.4" stroke="rgb(30,30,29)" stroke-width=".4"/>
+    <ellipse cx="29.6" cy="-89.5" rx="1.2" ry=".7" fill="rgb(52,50,42)"/>
+  </g>`;
 }
 function stream(svg,tl,tr){return `<div class="stream">${svg}<div class="ov"><div class="tl"><span class="live">●</span> ${tl}</div><div class="tr">${tr}</div></div></div>`}
 
@@ -545,6 +655,7 @@ function initHash(){
     const [a,b]=hsel.map(i=>HASH[i]);let diff=0;
     const line=(x,y)=>[...x[2]].map((ch,k)=>ch===y[2][k]?ch:`<span class="d">${ch}</span>`).join('');
     [...a[2]].forEach((ch,k)=>{if(ch!==b[2][k])diff++});
+    if(!diff)react('hash',['透','十六文字、最後まで同じだ。……同じデータが、もう一度流されている。']);
     out.innerHTML=`<div>${a[0]}  ${line(a,b)}</div><div>${b[0]}  ${line(b,a)}</div><span class="verdict" style="color:${diff?'var(--muted)':'var(--accent)'}">${diff?`${diff}文字違う。別のデータ。`:'完全に一致。同じデータ。'}</span>`;
   };
   rows.forEach(r=>{const go=()=>{const i=+r.dataset.h;if(hsel.includes(i))hsel=hsel.filter(x=>x!==i);else{hsel.push(i);if(hsel.length>2)hsel.shift()}draw()};r.onclick=go;r.onkeydown=e=>{if(e.key==='Enter')go()}});
@@ -556,12 +667,12 @@ function initDiff(){
   const caps={a:'ループ素材（10/06 の映像）の、同じ 03:43:59 のフレーム。',b:'10/12 の配信で、ループの継ぎ目に1フレームだけ混ざった映像。',d:'差分：2枚の画像を重ね、同じところは黒く、違うところだけが光る。'};
   document.querySelectorAll('.seg button').forEach(b=>b.onclick=()=>{
     document.querySelectorAll('.seg button').forEach(x=>x.classList.toggle('on',x===b));
-    const v=b.dataset.v; top.hidden=v==='a'; box.classList.toggle('diff',v==='d'); cap.textContent=caps[v];});
+    const v=b.dataset.v; top.hidden=v==='a'; box.classList.toggle('diff',v==='d'); cap.textContent=caps[v];if(v==='d')react('seam',['透','ノイズのほかに、一か所だけ光っている。']);});
 }
 // ===== 明るさ補正 =====
 function initBright(){
   const br=document.getElementById('br');
-  const f=()=>{const v=+br.value;document.querySelector('#enh svg').style.filter=`brightness(${v}) contrast(${1+(v-1)*.15}) saturate(${1-(v-1)*.1})`;document.getElementById('brv').textContent='×'+v.toFixed(1)};
+  const f=()=>{const v=+br.value;document.querySelector('#enh svg').style.filter=`brightness(${v}) contrast(${1+(v-1)*.15}) saturate(${1-(v-1)*.1})`;document.getElementById('brv').textContent='×'+v.toFixed(1);if(v>=5)react('fig',['透','黒より少しだけ明るい塊が、二つ。……人影だ。'])};
   br.oninput=f;f();
   initZoom(document.getElementById('enh'));
 }
@@ -573,6 +684,56 @@ function initZoom(box){
     if(!box.classList.contains('zoom')){const r=svg.getBoundingClientRect();svg.style.transformOrigin=`${(e.clientX-r.left)/r.width*100}% ${(e.clientY-r.top)/r.height*100}%`}
     box.classList.toggle('zoom');
   };
+}
+
+// ===== 配信の録画の再生（第一話 第二章） =====
+// 11分を20倍速で流す。03:38 と 03:41 に貨物の通過音が入り、03:44 に唐突に終わる。
+// 音は Web Audio で合成する（外部の音声ファイルは読まない）。50Hz のハム音と、低いノイズで作る通過音
+const RUMBLE=[[300,340],[480,525]]; // 03:33:00 からの秒
+let AC=null;
+function liveSound(){
+  try{
+    AC=AC||new (window.AudioContext||window.webkitAudioContext)();AC.resume();
+    const out=AC.createGain();out.gain.value=.5;out.connect(AC.destination);
+    const hum=[50,100,150].map((f,i)=>{const o=AC.createOscillator(),g=AC.createGain();o.frequency.value=f;g.gain.value=[.05,.03,.012][i];o.connect(g);g.connect(out);o.start();return o});
+    const buf=AC.createBuffer(1,AC.sampleRate*2,AC.sampleRate),d=buf.getChannelData(0);let v=0;
+    for(let i=0;i<d.length;i++){v=(v+.02*(Math.random()*2-1))/1.02;d[i]=v*3.5}
+    const src=AC.createBufferSource(),lp=AC.createBiquadFilter(),rg=AC.createGain();
+    src.buffer=buf;src.loop=true;lp.type='lowpass';lp.frequency.value=140;rg.gain.value=0;
+    src.connect(lp);lp.connect(rg);rg.connect(out);src.start();
+    return {rumble:on=>rg.gain.setTargetAtTime(on?.9:0,AC.currentTime,.25),
+      stop:()=>{out.gain.setTargetAtTime(0,AC.currentTime,.05);setTimeout(()=>{hum.forEach(o=>o.stop());src.stop();out.disconnect()},300)}};
+  }catch(e){return null}
+}
+function initLive(el){
+  const box=el.querySelector('#live'),svg=box.querySelector('svg'),tr=box.querySelector('.tr'),cap=el.querySelector('#lvcap');
+  const play=el.querySelector('#lvplay'),snd=el.querySelector('#lvsnd'),flip=el.querySelector('#lvflip');
+  const cap0=cap.textContent,play0=play.textContent;let t=0,timer=null,sound=null,wantSound=false;
+  const stamp=s=>`03:${33+Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
+  const stop=label=>{clearInterval(timer);timer=null;sound?.stop();sound=null;box.classList.remove('rumble');play.textContent=label};
+  const tick=()=>{
+    if(!el.isConnected)return stop(play0);
+    t+=2;const r=RUMBLE.some(([a,b])=>t>=a&&t<b),end=t>=660;
+    tr.innerHTML=`${stamp(Math.min(t,659))}<br>視聴 12`;
+    box.classList.toggle('rumble',r);sound?.rumble(r);
+    cap.textContent=end?'03:44。画面は唐突に黒に戻った。':r?`${stamp(t).slice(0,5)}　（遠くで、重いものが転がるような低い音）`:'（かすかな低い唸りのほかは、何も聞こえない）';
+    if(end){svg.style.visibility='hidden';stop('▶ もう一度再生');react('live',['透','十一分間、何も起きなかった。動いたのは、音だけだ。三時三十八分と、四十一分。'])}
+  };
+  play.onclick=()=>{
+    svg.style.visibility='';
+    if(timer){stop(play0);tr.innerHTML='03:35:12<br>視聴 12';cap.textContent=cap0;return}
+    t=0;play.textContent='■ 止める';if(wantSound)sound=liveSound();timer=setInterval(tick,100);
+  };
+  snd.onclick=()=>{wantSound=!wantSound;snd.textContent=wantSound?'音 ON':'音 OFF';snd.classList.toggle('on',wantSound);
+    if(timer){if(wantSound)sound=liveSound();else{sound?.stop();sound=null}}};
+  flip.onclick=()=>{const on=flip.classList.toggle('on');svg.style.transform=on?'scaleX(-1)':'';
+    if(on)react('flip',['透','時計の数字が、ちゃんと読める。……この配信は、左右が逆に映っている。'])};
+}
+// アプリの中で何かに気づいたとき、語りに一言だけ差しこむ（話ごとに一度きり）。読みかけの語りの続きは、そのあとに残る
+function react(key,line){
+  if(S.seen['r-'+key])return;
+  S.seen['r-'+key]=true;save();
+  NR.lines=[...NR.lines.slice(0,NR.i+1),line,...NR.lines.slice(NR.i+1)];NR.i++;showNarr(true);showLine();
 }
 
 // ===== 端末 =====
@@ -617,7 +778,7 @@ Expires:  2027-03-17
   20240102
   20261001
 <span class="dim">日付を付けて開く: wayback utsuro.tv 20210320</span>`,
- 'wayback utsuro.tv 20210320':()=>`[ 2021-03-20 時点の保存版 ]
+ 'wayback utsuro.tv 20210320':()=>{react('ipcam',['透','うつろ放送の最初の姿は、カメラの設定画面そのものだった。配信のために置かれたカメラじゃない。']);return `[ 2021-03-20 時点の保存版 ]
 ページタイトル: IPCAM Live View
 
   ネットワークカメラ ライブビュー
@@ -625,7 +786,7 @@ Expires:  2027-03-17
   Name     : cam01
   Wi-Fi    : KH-CORPO-3F-E (2.4GHz)
   Status   : streaming
-<span class="dim"># カメラの初期設定画面がそのまま公開されていた。</span>`,
+<span class="dim"># カメラの初期設定画面がそのまま公開されていた。</span>`},
  'wayback utsuro.tv 20220811':()=>`[ 2022-08-11 ] 「うつろ放送」へ改装済み。カメラの情報は消えている。`,
  'wayback utsuro.tv 20240102':()=>`[ 2024-01-02 ] 会員限定アーカイブ（月額980円）が追加された。`,
  'wayback utsuro.tv 20261001':()=>`[ 2026-10-01 ] 現在とほぼ同じ。`,
@@ -657,7 +818,7 @@ Created: 2014-06-02`,
  'curl kuga-housing.jp/properties/heights-tsukimizaka':()=>`ハイツ月見坂（月見台七丁目）
 2階建て ・ 満室`,
 };
-function A(){return `UA-48213077 を使うサイト:
+function A(){react('ua',['透','同じ解析アカウント。二つのサイトの持ち主は、同じ人間だ。']);return `UA-48213077 を使うサイト:
   UA-48213077-1  kuga-housing.jp   「久我ハウジング管理」
   UA-48213077-2  utsuro.tv         「うつろ放送」
 <span class="dim"># 同じ解析アカウントで管理されている。持ち主は同じ。</span>`}
@@ -786,7 +947,7 @@ const CH1=[
    traps:[[/^(shinomiya|toru|篠宮|透)/,'本名ではない。透さんがネットで名乗っていた名前だ。'],[/ghost/,'つづりを確かめよう。']],
    memo:'2036年。透さんが逮捕された。残されたのは、2026年の最初の事件のファイル。'}
  ],
- hints:['透さんのメッセージには「最初に名乗った名前」とある。','「資料」に、透さんが学生時代に使っていたプロフィールがある。'],
+ hints:[['透さんのメッセージには「最初に名乗った名前」とある。','「資料」に、透さんが学生時代に使っていたプロフィールがある。']],
  solved:`<p>ファイルが開いた。中身は、透さんが大学三年のときに使っていたノートPCのディスクイメージ。捜査メモと、集めたログのすべて。</p>
  <p>透さんはよく、この事件のことを話してくれた。酔ったときだけ、少しずつ。これが、透さんが「こっち側」に来た最初の事件だった。</p>
  <p>ここからは、透さんから聞いた話と、このファイルをもとに書く。</p>`,
@@ -832,7 +993,8 @@ $ open 2026_utsuro.enc
    traps:[[/渋谷|道玄坂/,'管理画面と位置共有で、時刻の表記がそろっているか確かめよう。'],[/中野|自宅/,'その時刻、スマホは家にはなかった。']],
    memo:'公開は 10/10 18:52 UTC = 10/11 03:52（日本時間）。スマホは月見台二丁目。04:20 に電源が切れた。'}
  ],
- hints:['過去の記事の書き方の癖（記号、一人称）と、「お別れ」を比べよう。','管理画面の時刻はUTC（協定世界時）。日本時間はUTCに9時間足す。','10/10 18:52 UTC は、日本時間で 10/11 の何時か。その時刻の位置記録を探そう。'],
+ hints:[['過去の記事の書き方の癖（記号、一人称）と、「お別れ」を比べよう。','「管理画面」で、ほかの記事が公開されるまでの手順と比べよう。'],
+  ['管理画面の時刻はUTC（協定世界時）。日本時間はUTCに9時間足す。','10/10 18:52 UTC は、日本時間で 10/11 の何時か。その時刻の位置記録を探そう。']],
  solved:`<p>「お別れ」は遼の書き方ではない。しかも公開されたのは日本時間の 10/11 03:52、スマホは<b>月見台二丁目</b>にあった。その1時間前、遼自身がスマホで書いた下書きが残っている。「例の建物の前」「管理会社の人が中を見せてくれる」。</p>
  <p>遼のブラウザ履歴には、深夜3時台に同じURLが何度も出てくる。<span class="mono">utsuro.tv</span>。サイト名は「うつろ放送」。</p>`,
  apps:[
@@ -869,7 +1031,7 @@ $ open 2026_utsuro.enc
  id:2,no:'第二章',title:'うつろの部屋',theme:'y2026',mark:'',clock:'2026/10/20 03:33',where:'透のアパート',
  narr:[[M,'透さんは今でも、窓のある部屋の写真を見るとまず時計を探す。癖になったのはこの夜からだと、笑っていた。','frame'],
   ['','10月20日、火曜日。午前三時三十二分。透は自分のアパートで、明かりを消してノートパソコンの前に座っていた。'],
-  ['','3時33分。ブックマークを開くと、黒い画面がふっと明るくなった。'],
+  ['','3時33分。ブックマークを開くと、黒い画面がふっと明るくなった。透は録画を回した。'],
   ['','畳の和室。押入れ、壁掛け時計、窓の外には踏切と看板の灯り。誰もいない。視聴者は12人。コメント欄は止まったまま。'],
   ['透','霊は住所を持たない。でも部屋は持っている。窓の外、音、電気。映像には撮った場所が必ず残る。']],
  open:['stream'],
@@ -887,13 +1049,16 @@ $ open 2026_utsuro.enc
    traps:[[/白鷺/,'その建物の窓から、店の看板は読めるだろうか。'],[/メゾン/,'その建物の窓から、看板の表は見えるだろうか。看板がどの壁についているか確かめよう。'],[/北総/,'その近くの店は「ツキミ ランドリー」ではない。']],
    memo:'窓から看板と、その右に踏切が見える建物は「コーポ月見台」。'}
  ],
- hints:['壁の時計を見よう。数字の並びが逆になっている。','映像では踏切が看板の左に見える。でも映像は反転しているので、実際には踏切は看板の右にある。','地図で「ランドリー」を検索。看板の向きと、周りの建物の窓の向きを確かめよう。窓から外を見て、看板の右に踏切が見える建物は？'],
+ hints:[['「音声解析」の通過音の時刻を「貨物時刻表」と比べよう。同じ時刻に通る路線が二つある。','電源ノイズは50Hz。50Hzの地域（東日本）を走っているのはどちらか。'],
+  ['壁の時計を見よう。数字の並びが逆になっている。','映像は左右が反転している。看板の文字を右から読もう。'],
+  ['地図で「ランドリー」を検索。看板がどの壁についているか、周りの建物の窓がどちらを向いているかを確かめよう。','映像では踏切が看板の左に見える。反転を戻すと、踏切は看板の右。窓から看板の表と、その右に踏切が見える建物は？']],
  solved:`<p>部屋は<b>コーポ月見台</b>にある。地図の口コミには「3階の東の角部屋、何年も空いてるのに、夜中にカーテンの隙間が光ってる」。</p>
  <p>事故物件サイトによれば、2021年3月14日、コーポ月見台の3階で住人の女性が亡くなっている。部屋番号は伏せられていた。</p>
  <p>気になることがひとつ。東湾貨物線は平日しか走らない。なのに、日曜（10/18）の配信にも3:38の通過音が入っていた。</p>`,
  apps:[
-  {id:'stream',name:'うつろ放送',icon:'rec',title:'うつろ放送 ― LIVE',w:600,h:480,flush:true,html:browser('utsuro.tv/live',`${stream(roomSVG(),'LIVE うつろ放送','03:35:12<br>視聴 12')}
-   <div class="cap">10/20（火）03:35 のスクリーンショット。窓の外に踏切と看板、正面の壁に時計。</div>`)},
+  {id:'stream',name:'うつろ放送',icon:'rec',title:'うつろ放送 ― LIVE',w:600,h:560,flush:true,init:initLive,html:browser('utsuro.tv/live',`<div id="live">${stream(roomSVG(),'LIVE うつろ放送','03:35:12<br>視聴 12')}</div>
+   <div class="seg" role="group" aria-label="録画の操作"><button type="button" id="lvplay">▶ 録画を再生（20倍速）</button><button type="button" id="lvsnd">音 OFF</button><button type="button" id="lvflip">左右反転</button></div>
+   <div class="cap" id="lvcap">10/20（火）の配信を録画したもの。窓の外に踏切と看板、正面の壁に時計。</div>`)},
   {id:'audio',name:'音声解析',icon:'wave',title:'Spectra ― utsuro_1020.wav',w:480,h:430,html:`<b>低周波スペクトル（03:33〜03:44）</b>
    <div><div class="spec">${[6,8,7,9,10,12,14,96,22,12,9,8,8,30,9,7,6,7,6,5].map((h,i)=>`<i class="${i==7?'pk':''}" style="height:${h}%"></i>`).join('')}</div>
    <div class="speclab"><span>0 Hz</span><span>▲ 50 Hz</span><span>100 Hz</span><span>200 Hz</span></div></div>
@@ -930,7 +1095,8 @@ $ open 2026_utsuro.enc
    traps:[[/^30[13]/,'カメラが接続していたWi-Fiの名前に、方角が入っている。'],[/^3$|^3階/,'階まではわかった。何号室かまで絞ろう。']],
    memo:'2021年のカメラ画面のWi-Fi名「KH-CORPO-3F-E」＝3階東。間取り図で3階東は302号室。'}
  ],
- hints:['まず history で、遼が何を調べていたか見よう。次に view-source utsuro.tv。','ソースにある解析ID（UA-…）を analytics で逆引きしよう。','wayback utsuro.tv で一番古い版を開き、カメラ画面のWi-Fi名を見る。kuga-housing.jp の物件ページに間取りがある。'],
+ hints:[['まず history で、遼が何を調べていたか見よう。次に view-source utsuro.tv。','ソースにある解析ID（UA-…）を analytics で逆引きしよう。'],
+  ['wayback utsuro.tv で一番古い版を開き、カメラ画面のWi-Fi名を見よう。','curl kuga-housing.jp から物件ページをたどると、Wi-Fi名の付け方と間取り図がある。']],
  solved:`<p>部屋は<b>302号室</b>。2021年に募集を止めたまま、5年間空室になっている。</p>
  <p>管理会社は久我ハウジング管理。担当は<b>久我 圭吾</b>。電話をかけると、久我は穏やかに答えた。「302号室ですか。あそこはずっと空いてますよ。……出る、って噂があるもので」</p>`,
  apps:[
@@ -961,11 +1127,13 @@ $ open 2026_utsuro.enc
   {type:'text',q:'10/11 の映像で、奥に立つ男の手首にあるものは？',
    check:v=>/時計|とけい|watch/.test(v),
    traps:[[/スマホ|携帯|電話/,'それは手前の人影が持っているもの。奥の男の手首を見よう。']],
-   memo:'10/11 の配信には、スマホを持った遼と、腕時計をした男が映っていた。'}
+   memo:'10/11 の配信には、スマホを持った遼と、腕時計をした男が映っていた。映像では右の手首。配信は左右が逆なので、本当は左の手首。'}
  ],
- hints:['表の行を2つタップすると、ハッシュ値を1文字ずつ比較できる。','10/11 より後の行を、それより前の行と最後の1文字まで比べよう。完全に一致する最初の日はいつか。','10/11 の映像は明るさ補正を最大近くまで上げよう。奥の人影の右手首に、小さく光るものがある。'],
+ hints:[['「ハッシュ値」の表の行を2つタップすると、1文字ずつ比較できる。','10/11 より後の行を、それより前の行と最後の1文字まで比べよう。完全に一致する最初の日はいつか。'],
+  ['10/12、10/13、10/14 が、それぞれどの日と一致するか順に比べよう。'],
+  ['「10/11 の録画」の明るさ補正を最大近くまで上げよう。','奥の人影の、画面で右側の手首を拡大しよう。小さく光るものがある。']],
  solved:`<p><b>10/12</b>以降の配信は、10/06〜10/08 の映像を3日ずつ繰り返していた。</p>
- <p>10/11 の映像を明るくすると、人影が二つ浮かび上がる。スマホを握った遼と、その背後に立つ男。男の手首で、<b>腕時計</b>が光った。</p>
+ <p>10/11 の映像を明るくすると、人影が二つ浮かび上がる。スマホを握った遼と、その背後に立つ男。男の手首で、<b>腕時計</b>が光った。映像の中では右の手首。この配信は左右が逆だから、本当は左の手首だ。</p>
  <p>配信は、遼が消えた夜までは本物のライブだった。映ったのは霊ではない。生きている人間だった。</p>`,
  apps:[
   {id:'hash',name:'ハッシュ値',icon:'sheet',title:'hashes_1005-1018.csv ― 灯籠から',w:560,h:520,init:initHash,html:`<div class="cap">各夜 03:35 を含む配信データ（SHA-256 先頭16桁）。行を2つタップすると比較できます。</div>
@@ -978,10 +1146,10 @@ $ open 2026_utsuro.enc
  ]
 },
 {
- id:5,no:'第五章',title:'招かれた者',theme:'y2026',mark:'',clock:'2026/10/22 18:25',where:'コーポ月見台 302号室',
+ id:5,no:'第五章',title:'招かれた者',theme:'y2026',mark:'',foe:'久我',retreat:'……もういいでしょう、篠宮さん。内見は、ここまでにしましょうか。',clock:'2026/10/22 18:25',where:'コーポ月見台 302号室',
  narr:[[M,'この先を話すとき、透さんはいつも少しだけ黙った。そして必ず、最後に花の話をした。','frame'],
   ['','その日の昼、灯籠からもう一通メッセージが届いていた。'],
-  ['','302号室の内見を申し込んだ。久我は鍵を手に、にこやかに現れた。銀色の腕時計が、袖口からのぞいている。'],
+  ['','302号室の内見を申し込んだ。久我は鍵を手に、にこやかに現れた。銀色の腕時計が、左の袖口からのぞいている。'],
   ['久我','本当に入ります？ 夜中にね、カメラも何もないのに、あの部屋が映るって噂があるんですよ。'],
   ['','カメラがないはずの部屋。けれど天井の隅には、ネジ穴が四つ残っていた。']],
  chat:{with:'灯籠',msgs:[['灯籠','12:31','十二日の配信を、コマ送りで全部見直した。<br>ループのつなぎ目に、一コマだけ変なのが混ざってる。三時四十三分五十九秒。'],['灯籠','12:32','画像を2枚送る。「継ぎ目」で開いてくれ。']]},
@@ -994,26 +1162,31 @@ $ open 2026_utsuro.enc
    memo:'犯人は久我圭吾。302号室の鍵を管理していて、10/11 の深夜にアリバイがない。'},
   {type:'choice',tag:'対決 1',q:'<span class="say">久我</span>「配信？ あれは毎晩、あの部屋のありのままを流しているだけですよ」<br>どの証拠で崩す？',
    options:['日曜（10/18）の配信に、平日しか走らない貨物の音が入っている','黒澄レイには、大阪から生配信していた記録がある','「お別れ」は下書き保存をせずに公開された','302号室は2021年3月から募集を止めている'],answer:0,
-   why:()=>'それは、配信がライブかどうかとは関係がない。',
+   why:()=>'久我「それが、配信と何の関係があるんです？」 ― 配信がライブではないと示す証拠を出そう。',
    memo:'配信は10/12から録画だった。日曜の配信に、平日の貨物の音が入っていた。'},
   {type:'choice',tag:'対決 2',q:'<span class="say">久我</span>「うつろ放送？ 噂は知っていますが、うちとは何の関係もありません」<br>どの証拠で崩す？',
    options:['配信は10/12から過去の映像に差し替えられた','うつろ放送と久我ハウジング管理のサイトは、同じ解析アカウントを使っている','遼のスマホは04:20に電源が切れた','10/11の配信のハッシュ値は、他のどの日とも一致しない'],answer:1,
-   why:()=>'それは久我とサイトを結びつけない。持ち主が同じだと示す証拠はどれか。',
+   why:()=>'久我「だからといって、うちのサイトだということにはなりませんよ」 ― 持ち主が同じだと示す証拠はどれか。',
    memo:'うつろ放送と久我ハウジング管理は同じ解析アカウント。カメラのWi-Fiは KH-CORPO-3F-E、この部屋。'},
   {type:'choice',tag:'対決 3',q:'<span class="say">久我</span>「水野さんは、ご自分で『お別れ』を書いて出ていかれたんでしょう」<br>どの証拠で崩す？',
    options:['遼は10/10の夜、一度中野の自宅に帰っている','管理画面の時刻はUTCで記録されている','「お別れ」が公開された03:52、遼のスマホはこの建物にあった','黒澄レイと遼は、ネタの取り合いで揉めていた'],answer:2,
-   why:i=>i===1?'それだけでは足りない。UTCを日本時間に直すと、何がわかったか。':'それでは、別の誰かが書いたことにはならない。',
+   why:i=>i===1?'久我「時刻の書き方が、どうかしましたか」 ― それだけでは足りない。日本時間に直すと、何がわかったか。':'久我「それで、どうして別の誰かが書いたことになるんです」',
    memo:'「お別れ」は日本時間の03:52、この建物の中で、遼のスマホから別の誰かが書いた。'},
   {type:'choice',tag:'対決 4',q:'<span class="say">久我</span>「あの夜に映ったのは、招かれた人の影ですよ。霊です」<br>どの証拠で崩す？',
-   options:['映像は左右が反転している','電源ノイズは50Hzだった','窓の外にツキミ ランドリーの看板が見える','10/11の映像の奥の男の右手首に、腕時計が光っている'],answer:3,
-   why:()=>'影が霊ではなく、生きた人間だと示すものはどれか。',
-   memo:'10/11 に映ったのは霊ではなく、スマホを持った遼と、腕時計をした男。久我は自分の右手首を押さえた。'},
+   options:['映像は左右が反転している','電源ノイズは50Hzだった','窓の外にツキミ ランドリーの看板が見える','10/11の映像の奥の男の手首に、腕時計が光っている'],answer:3,
+   why:()=>'久我「それは部屋の話でしょう。影の話ではない」 ― 影が生きた人間だと示すものはどれか。',
+   memo:'10/11 に映ったのは霊ではなく、スマホを持った遼と、腕時計をした男。久我は、腕時計を巻いた自分の左手首を押さえた。'},
   {type:'text',tag:'最後',q:'<span class="say">久我</span>「……この部屋には、何もありませんよ」<br>どこを開けさせる？',
    check:v=>/押入|押し入れ|おしいれ|襖|ふすま/.test(v),
    traps:[[/天井|床|窓|外|ベランダ|浴室|風呂|トイレ|玄関|台所/,'灯籠が送ってきた「継ぎ目」を差分で重ねると、違うところだけが光る。光ったのはどこか。']],
    memo:'継ぎ目の一コマで、押入れの襖が指一本ぶん開いていた。差し替えの作業をした夜、閉め忘れたのだろう。'}
  ],
- hints:['「関係者」でアリバイと鍵を確かめよう。10/11 の深夜に302号室に入れたのは誰か。','久我の言い分ごとに、捜査ノートの「わかったこと」を見返そう。それぞれの言い分を崩せる事実が一つずつある。','最後は灯籠が送ってきた「継ぎ目」。「差分」ボタンで2枚を重ねたとき、光ったのはどこか。'],
+ hints:[['「関係者」でアリバイと鍵を確かめよう。10/11 の深夜に302号室に入れたのは誰か。'],
+  ['配信が「ありのまま」でないと最初に気づいたのは、どの音からだったか。捜査ノートの「わかったこと」を見返そう。'],
+  ['第三章で、二つのサイトを結びつけたものは何だったか。'],
+  ['第一章で、公開の時刻を日本時間に直したとき、スマホはどこにあったか。'],
+  ['第四章で、明るさを上げた映像に何が映っていたか。'],
+  ['灯籠が送ってきた「継ぎ目」を開き、「差分」ボタンで2枚を重ねよう。光ったのはどこか。']],
  solved:`<p>ドアが開き、架純と二人の刑事が入ってきた。刑事の一人が、押入れの襖を開けた。</p>
  <p>水野遼は、そこにいた。</p>`,
  apps:[
@@ -1033,42 +1206,79 @@ $ open 2026_utsuro.enc
 // ===== 第二話の絵 =====
 // 事務所のうつろ放送。入口の上の角から窓のほうを見下ろす。正しい向きのカメラなので時計は反転しない（3時35分）
 function officeSVG(o={}){
-  const bld=[[150,58,40],[195,80,30],[230,50,45],[280,74,35],[320,40,50],[375,68,40],[420,54,45],[470,84,35],[510,44,50],[565,64,45]];
-  const lit=[[160,70],[240,64],[332,52],[344,70],[430,66],[520,58],[578,78],[248,92]];
-  // 録画の11分間に通ったのは乗用車4台とタクシー1台。トラックは描かない
-  const cars=[[176,0],[262,0],[352,1],[468,0],[560,0]].map(([x,t])=>`<rect x="${x}" y="116" width="15" height="6" rx="2" fill="${t?'rgb(150,128,46)':'rgb(74,78,90)'}"/><circle cx="${x+14}" cy="119" r="1.6" fill="rgb(255,240,200)"/><circle cx="${x+1}" cy="119" r="1.4" fill="rgb(220,60,50)"/>`).join('');
+  const id='vg'+(svgN++),W=7,D=3.75,H=2.6;
+  const P=camera([.25,.2,2.45],[2.75,D,.8],400),{pg,box,plane}=draw3d(P);
+  const f=c=>`fill="rgb(${c})"`;
+  const far=(x0,z0,x1,z1,attr)=>pg([[x0,D,z0],[x1,D,z0],[x1,D,z1],[x0,D,z1]],attr); // 奥の壁の上の長方形
+  const flr=(x0,y0,x1,y1,attr)=>pg([[x0,y0,0],[x1,y0,0],[x1,y1,0],[x0,y1,0]],attr);
+  const panes=[[1.23,2.59],[2.65,4.01],[4.07,5.43],[5.49,6.85]],pane=([a,b])=>[[a,D,.9],[b,D,.9],[b,D,2.3],[a,D,2.3]];
+  // 窓の外。五階から見下ろすので空は見えない。奥にビル、その手前を首都高の高架が横切る
+  const bld=[[-10,6,80],[8,24,96],[27,40,122],[42,60,88],[63,82,112],[85,112,100],[115,150,126],[152,200,108]].map(([x0,x1,y],i)=>
+    pg([[x0,y,-30],[x0,y+16,-30],[x0,y+16,30],[x0,y,30]],f('12,14,21'))+pg([[x0,y,-30],[x1,y,-30],[x1,y,30],[x0,y,30]],f(i%2?'19,22,31':'16,19,27'))
+    +`<g transform="${plane([x0,y,2],[100,0,0],[0,0,-100])}">${Array.from({length:8},(_,r)=>Array.from({length:Math.floor((x1-x0)/2.6)},(_,c)=>{const h=(i*73+r*31+c*17)%13;
+      return h<3?`<rect x="${(c*2.6+.7).toFixed(1)}" y="${r*3.4+.8}" width="1.5" height="1.5" fill="rgb(${h?'150,132,84':'118,136,146'})"/>`:''}).join('')).join('')}</g>`).join('');
+  // 高架の上の車。録画の11分間に通ったのは乗用車4台とタクシー1台。トラックは描かない
+  const Y0=30,Y1=41.5,Z=-6; // 高架の路面。手前の車線は右へ、奥の車線は左へ流れる
+  const car=(x,y,c,taxi)=>{const fwd=y<35,[h1,h2]=P(fwd?x+4.4:x,y+.3,Z+.4),[t1,t2]=P(fwd?x:x+4.4,y+.3,Z+.45);
+    return box(x,y,Z,x+4.4,y+1.7,Z+.7,f(c.map(v=>v+16)),f(c.map(v=>v-12)),f(c))+box(x+1.2,y+.12,Z+.7,x+3.3,y+1.58,Z+1.18,f(c.map(v=>v+10)),f('14,16,20'),f('16,18,24'))
+      +(taxi?box(x+2.05,y+.6,Z+1.18,x+2.45,y+1.1,Z+1.36,f('236,226,180'),f('200,190,150'),f('226,214,160')):'')
+      +`<circle cx="${h1.toFixed(1)}" cy="${h2.toFixed(1)}" r="6" fill="url(#${id}hl)"/><circle cx="${h1.toFixed(1)}" cy="${h2.toFixed(1)}" r="1.2" fill="rgb(255,244,214)"/><circle cx="${t1.toFixed(1)}" cy="${t2.toFixed(1)}" r="1" fill="rgb(214,52,44)"/>`};
+  const way=pg([[-30,Y1,Z-1],[220,Y1,Z-1],[220,Y1,Z+.7],[-30,Y1,Z+.7]],f('46,45,46'))
+    +pg([[-30,Y0,Z],[220,Y0,Z],[220,Y1,Z],[-30,Y1,Z]],f('41,40,39'))
+    +pg([[-30,35.6,Z],[220,35.6,Z],[220,35.9,Z],[-30,35.9,Z]],f('72,70,64'))
+    +[9,31,53,75,97].map(x=>pg([[x,32,Z],[x+9,32,Z],[x+9,40,Z],[x,40,Z]],`fill="rgb(160,128,74)" opacity=".15"`)).join('')
+    +car(47,37.6,[62,64,70])+car(29,37.9,[36,38,46])+car(39,31.6,[104,106,104])+car(22.5,31.8,[150,124,44],true)+car(13.5,31.5,[70,48,46])
+    +pg([[-30,Y0,Z-1.4],[220,Y0,Z-1.4],[220,Y0,Z+.5],[-30,Y0,Z+.5]],`fill="url(#${id}wy)"`)
+    +[11,35,59,83].map(x=>box(x,33,-30,x+2.2,38,Z-1.4,f('20,21,24'),f('24,25,28'),f('32,33,36'))).join('');
+  const roofs=[[6,16,12,24,-17],[19,33,9,22,-21],[37,52,13,25,-16]].map(([x0,x1,y0,y1,z])=>box(x0,y0,-30,x1,y1,z,f('24,26,31'),f('13,14,19'),f('17,19,25'))+box(x0+3,y0+3,z,x0+6,y0+5.5,z+1.2,f('40,42,46'),f('20,21,25'),f('28,30,34'))).join('');
+  const outside=`<g clip-path="url(#${id}w)"><rect width="640" height="360" fill="rgb(8,10,16)"/>${bld}${pg([[-30,42,-30],[220,42,-30],[220,42,Z-1],[-30,42,Z-1]],'fill="rgb(9,10,14)" opacity=".7"')}${way}${roofs}
+    ${panes.map(p=>pg(pane(p),`fill="url(#${id}gl)"`)).join('')}</g>`;
+  // 机。天板と、部屋の側に下がった幕板
+  const desk=(x0,x1)=>box(x0,2.78,.05,x0+.04,3.36,.7,null,f('30,27,25'),f('38,34,31'))+box(x1-.04,2.78,.05,x1,3.36,.7,null,f('30,27,25'),f('38,34,31'))
+    +box(x0+.04,2.84,.22,x1-.04,2.86,.7,null,null,`fill="url(#${id}dk)"`)+box(x0,2.75,.7,x1,3.39,.735,`fill="url(#${id}dt)"`,f('44,39,34'),f('58,51,44'));
+  const chair=x=>`<g transform="${plane([x,3.5,1.24],[1,0,0],[0,0,-1])}"><rect x="-21" y="0" width="42" height="50" rx="8" fill="rgb(24,25,29)"/><rect x="-18" y="3" width="36" height="34" rx="6" fill="rgb(31,33,38)"/><rect x="-3" y="50" width="6" height="12" fill="rgb(20,21,24)"/></g>`;
+  const phone=o.phone?`<g transform="${plane([4.78,3.02,.737],[.97,.24,0],[.24,-.97,0])}"><rect width="8" height="16.4" rx="1.2" fill="rgb(8,9,12)"/><rect x=".6" y=".8" width="6.8" height="14.8" rx=".8" fill="rgb(40,49,68)"/><path d="M.9 13 L7.1 3.4 V1.2 L.9 10.4Z" fill="rgb(150,170,200)" opacity=".35"/></g>`:'';
+  const flower=o.flower?`<g transform="${plane([6.2,3.68,.92],[1,0,0],[0,0,-1])}"><rect x="-2.6" y="-12" width="5.2" height="12" rx=".8" fill="rgb(150,172,184)" opacity=".42"/><rect x="-2.6" y="-5" width="5.2" height="5" fill="rgb(120,150,165)" opacity=".3"/>
+    <path d="M0 -3 Q-.6 -14 1.2 -25" stroke="rgb(58,92,60)" stroke-width="1.1" fill="none"/><path d="M.2 -15 q4 -3 6 -1 q-3 2.4 -6 1z" fill="rgb(52,84,56)"/>
+    ${[0,72,144,216,288].map(a=>`<ellipse cx="1.4" cy="-30" rx="2.3" ry="3.6" transform="rotate(${a} 1.4 -26.6)" fill="rgb(${a%144?'214,214,206':'228,228,220'})"/>`).join('')}<circle cx="1.4" cy="-26.6" r="1.4" fill="rgb(168,150,84)"/></g>`:'';
+  const [lx,ly]=P(3.6,2.3,0).map(v=>v.toFixed(1));
   return `<svg viewBox="0 0 640 360" role="img" aria-label="うつろ放送の配信画面。夜の事務所">
-  <defs><radialGradient id="ofv" cx="50%" cy="50%" r="70%"><stop offset="60%" stop-color="#000" stop-opacity="0"/><stop offset="100%" stop-color="#000" stop-opacity=".6"/></radialGradient></defs>
-  <rect width="640" height="360" fill="rgb(36,40,50)"/>
-  <rect x="150" y="30" width="460" height="160" fill="rgb(12,16,28)"/>
-  ${bld.map(([x,y,w])=>`<rect x="${x}" y="${y}" width="${w}" height="${190-y}" fill="rgb(22,26,38)"/>`).join('')}
-  ${lit.map(([x,y])=>`<rect x="${x}" y="${y}" width="5" height="4" fill="rgb(120,112,80)"/>`).join('')}
-  <rect x="150" y="107" width="460" height="2" fill="rgb(72,74,86)"/>
-  <rect x="150" y="113" width="460" height="12" fill="rgb(46,48,58)"/>
-  <rect x="150" y="125" width="460" height="3" fill="rgb(28,30,38)"/>
-  ${[190,300,410,520].map(x=>`<rect x="${x}" y="128" width="10" height="62" fill="rgb(32,34,44)"/>`).join('')}
-  ${cars}
-  <rect x="150" y="30" width="460" height="160" fill="none" stroke="rgb(78,80,88)" stroke-width="6"/>
-  <line x1="303" y1="30" x2="303" y2="190" stroke="rgb(78,80,88)" stroke-width="4"/><line x1="456" y1="30" x2="456" y2="190" stroke="rgb(78,80,88)" stroke-width="4"/>
-  <rect x="144" y="188" width="472" height="9" fill="rgb(88,90,96)"/>
-  ${o.flower?`<g><rect x="540" y="176" width="9" height="12" fill="rgb(150,170,180)" opacity=".5"/><path d="M544.5 176 L545 160" stroke="rgb(70,110,70)" stroke-width="1.5"/>
-   <circle cx="545" cy="157" r="5" fill="rgb(232,232,226)"/><circle cx="540" cy="160" r="3.5" fill="rgb(222,222,216)"/><circle cx="550" cy="160" r="3.5" fill="rgb(222,222,216)"/><circle cx="545" cy="153" r="3" fill="rgb(240,240,234)"/></g>`:''}
-  <g transform="translate(78 84)">
-   <circle r="23" fill="rgb(190,186,176)" stroke="rgb(60,58,52)" stroke-width="3"/>
-   <g font-family="IBM Plex Mono, monospace" font-size="9" fill="rgb(40,40,40)" text-anchor="middle"><text y="-12">12</text><text x="15" y="3">3</text><text y="19">6</text><text x="-15" y="3">9</text></g>
-   <line x1="0" y1="0" x2="11" y2="3.5" stroke="rgb(30,30,30)" stroke-width="2.5"/><line x1="0" y1="0" x2="-8" y2="15" stroke="rgb(30,30,30)" stroke-width="2"/>
-  </g>
-  <polygon points="0,215 640,215 640,360 0,360" fill="rgb(50,48,46)"/>
-  ${[0,1,2,3,4,5].map(i=>`<line x1="${i*128}" y1="215" x2="${i*150-60}" y2="360" stroke="rgb(42,40,38)" stroke-width="2"/>`).join('')}
-  <rect x="0" y="210" width="640" height="5" fill="rgb(30,30,34)"/>
-  <rect x="226" y="176" width="70" height="40" rx="2" fill="rgb(18,20,24)" stroke="rgb(60,62,68)" stroke-width="2"/><rect x="256" y="216" width="10" height="8" fill="rgb(50,52,56)"/>
-  <polygon points="160,224 352,224 364,250 148,250" fill="rgb(96,84,70)"/><rect x="148" y="250" width="216" height="34" fill="rgb(70,60,50)"/>
-  <rect x="236" y="230" width="44" height="9" rx="1" fill="rgb(40,40,44)"/>
-  <rect x="474" y="156" width="52" height="60" rx="8" fill="rgb(28,28,32)"/>
-  <polygon points="396,216 590,216 600,240 386,240" fill="rgb(96,84,70)"/><rect x="386" y="240" width="214" height="34" fill="rgb(70,60,50)"/>
-  ${o.phone?`<g transform="rotate(-8 432 226)"><rect x="424" y="221" width="16" height="9" rx="1.5" fill="rgb(16,18,22)"/><rect x="426" y="222.5" width="12" height="6" rx="1" fill="rgb(34,42,56)"/></g>`:''}
-  <rect x="20" y="268" width="90" height="70" fill="rgb(44,44,48)"/><rect x="20" y="268" width="90" height="4" fill="rgb(60,60,66)"/>
-  <rect width="640" height="360" fill="url(#ofv)"/>
+  <defs>${camFx(id+'f')}${vignette(id+'v',.7)}
+   <clipPath id="${id}w">${panes.map(p=>pg(pane(p),'')).join('')}</clipPath>
+   <filter id="${id}bl" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="6"/></filter>
+   <radialGradient id="${id}hl"><stop offset="0" stop-color="rgb(255,236,190)" stop-opacity=".5"/><stop offset="1" stop-color="rgb(255,236,190)" stop-opacity="0"/></radialGradient>
+   <radialGradient id="${id}c" cx="58%" cy="42%" r="70%"><stop offset="0" stop-color="rgb(150,152,150)"/><stop offset="1" stop-color="rgb(104,106,108)"/></radialGradient>
+   <radialGradient id="${id}l" gradientUnits="userSpaceOnUse" cx="${lx}" cy="${ly}" r="420"><stop offset="0" stop-color="rgb(150,170,210)" stop-opacity=".1"/><stop offset=".4" stop-color="rgb(80,90,110)" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".6"/></radialGradient>
+   <linearGradient id="${id}wy" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="rgb(86,82,74)"/><stop offset="1" stop-color="rgb(40,40,42)"/></linearGradient>
+   <linearGradient id="${id}gl" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="rgb(170,190,210)" stop-opacity=".1"/><stop offset=".6" stop-color="rgb(170,190,210)" stop-opacity="0"/></linearGradient>
+   <linearGradient id="${id}dt" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="rgb(98,94,92)"/><stop offset="1" stop-color="rgb(60,54,49)"/></linearGradient>
+   <linearGradient id="${id}dk" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="rgb(50,45,40)"/><stop offset="1" stop-color="rgb(30,27,25)"/></linearGradient>
+   <linearGradient id="${id}t" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#000" stop-opacity=".45"/><stop offset="1" stop-color="#000" stop-opacity="0"/></linearGradient>
+  </defs>
+  <g filter="url(#${id}f)">
+  <rect width="640" height="360" fill="rgb(22,24,29)"/>
+  ${pg([[0,1,H],[W,1,H],[W,D,H],[0,D,H]],f('30,32,38'))}${[[1.6,2.0],[4.4,2.0]].map(([x,y])=>pg([[x,y,H],[x+1.25,y,H],[x+1.25,y+.32,H],[x,y+.32,H]],f('52,55,62'))).join('')}
+  ${flr(0,0,W,D,f('33,35,41'))}
+  ${Array.from({length:13},(_,i)=>flr(i*.5+.5,0,i*.5+.515,D,f('24,25,30'))).join('')}${Array.from({length:7},(_,i)=>flr(0,i*.5+.5,W,i*.5+.515,f('24,25,30'))).join('')}
+  <g filter="url(#${id}bl)" fill="rgb(150,168,200)" opacity=".2">${panes.map(([a,b])=>pg([[a-.15,3.62,0],[b-.15,3.62,0],[b-1,1.9,0],[a-1,1.9,0]],'')).join('')}</g>
+  <g filter="url(#${id}bl)" opacity=".55">${flr(1.3,2.7,3.35,3.5,'')}${flr(4.15,2.7,6.2,3.5,'')}${flr(0,2.5,.6,3.7,'')}</g>
+  ${flr(0,0,W,D,`fill="url(#${id}l)"`)}
+  ${pg([[0,1,0],[0,D,0],[0,D,H],[0,1,H]],f('34,37,45'))}
+  ${pg([[W,0,0],[W,D,0],[W,D,H],[W,0,H]],f('40,43,52'))}${pg([[W,0,0],[W,D,0],[W,D,H],[W,0,H]],`fill="url(#${id}t)"`)}
+  ${far(0,0,W,H,f('46,49,58'))}${outside}
+  ${far(0,0,W,H,`fill="url(#${id}t)"`)}
+  ${[1.17,2.59,4.01,5.43,6.85].map(x=>far(x,.9,x+.06,2.3,f('58,61,68'))).join('')}${far(1.17,2.26,6.91,2.33,f('54,57,64'))}${far(1.17,2.33,6.91,2.4,f('34,36,42'))}
+  ${box(1.1,3.57,.86,6.98,D,.9,f('84,88,96'),f('40,42,48'),f('52,55,62'))}${far(0,0,W,.06,f('24,25,29'))}
+  ${flower}
+  <g transform="${plane([.64,D,1.96],[1,0,0],[0,0,-1])}">${wallClock(`url(#${id}c)`,false)}</g>
+  ${chair(5.25)}${desk(4.25,6.12)}${box(5.72,2.92,.735,5.98,3.24,.8,f('74,78,88'),f('34,36,42'),f('44,47,54'))}${phone}
+  ${chair(2.45)}${desk(1.38,3.25)}
+  <g transform="${plane([1.86,3.08,1.2],[1,0,0],[0,0,-1])}"><rect x="27" y="36" width="8" height="10" fill="rgb(18,19,22)"/><rect x="20" y="45" width="22" height="2" fill="rgb(24,25,28)"/><rect width="62" height="37" rx="1.6" fill="rgb(17,18,22)"/><rect x="1" y="1" width="60" height="2" fill="rgb(40,42,48)"/><circle cx="31" cy="18" r="2" fill="rgb(26,27,32)"/></g>
+  ${box(1.52,2.84,.735,1.84,3.08,.775,f('132,134,134'),f('60,62,64'),f('84,86,88'))}${box(2.72,2.86,.735,3.08,3.12,.75,f('26,27,31'),f('16,17,20'),f('20,21,24'))}
+  ${box(.04,2.55,0,.5,3.6,.72,f('62,65,72'),null,f('44,46,53'))}${box(.1,2.85,.72,.46,3.35,.95,f('78,80,84'),null,f('56,58,62'))}
+  ${box(6.55,1.7,0,W,3.0,1.85,f('40,42,48'),f('46,48,56'),f('34,36,42'))}${[.5,.95,1.4].map(z=>pg([[6.55,1.72,z],[6.55,2.98,z],[6.55,2.98,z+.03],[6.55,1.72,z+.03]],f('26,27,32'))).join('')}
+  <rect width="640" height="360" fill="url(#${id}v)"/>
+  </g>${camNoise(id+'f')}
  </svg>`;
 }
 // 事務所の見取り図。カメラがありそうな場所を A〜D で示す
@@ -1090,43 +1300,125 @@ function planSVG(){
 }
 // 柊さんの定点カメラ。ランドリーの看板の上から、通りの向こうの跡地（駐車場）を北向きに見下ろす。東は右
 function lotSVG(o={}){
-  const top=x=>70+x*52,bot=x=>10+x*68;
+  const id='vg'+(svgN++);
+  const P=camera([0,0,4.4],[1.5,11,.3],310),{pg,box,plane,stand}=draw3d(P,0);
+  const f=c=>`fill="rgb(${c})"`,xy=(x,y,z)=>P(x,y,z).map(v=>+v.toFixed(1));
+  const flr=(x0,y0,x1,y1,attr)=>pg([[x0,y0,0],[x1,y0,0],[x1,y1,0],[x0,y1,0]],attr);
+  // 区画は手前に五つ、奥に五つ。手前の列は通り側に、奥の列はフェンス側に車止めがある
+  const X=i=>-6.25+i*2.5,rowsY=[[6.6,11.6,7.05],[14.4,19.4,18.85]];
+  const lines=rowsY.map(([y0,y1])=>Array.from({length:6},(_,i)=>flr(X(i)-.06,y0,X(i)+.06,y1,f('132,132,126'))).join('')).join('');
+  const stops=rowsY.map(([,,ys])=>Array.from({length:5},(_,i)=>[.35,1.55].map(d=>box(X(i)+d,ys,0,X(i)+d+.6,ys+.16,.12,f('128,126,118'),f('70,70,66'),f('92,91,86'))).join('')).join('')).join('');
+  const nums=rowsY.map(([y0,y1],r)=>Array.from({length:5},(_,i)=>`<g transform="${plane([X(i)+1.25,r?y0+1.5:y1-.3,0],[1,0,0],[0,-1,0])}"><text text-anchor="middle" font-family="IBM Plex Mono, monospace" font-weight="500" font-size="62" transform="scale(1 1.7)" fill="rgb(112,112,106)">${r*5+i+1}</text></g>`).join('')).join('');
+  // 車は2台。手前の列に暗い色のセダン、奥の列に白っぽい軽
+  const car=(x,y,len,w,h,c,g)=>`<g filter="url(#${id}bl)" opacity=".75">${flr(x-.25,y-.2,x+w+.25,y+len+.4,'fill="#000"')}</g>`
+    +box(x,y,.16,x+w,y+len,h*.56,f(c.map(v=>v+14)),f(c.map(v=>v-8)),f(c))+box(x+.08,y+len*.2,h*.56,x+w-.08,y+len*.86,h,f(c.map(v=>v+8)),f(g),f(g))
+    +pg([[x+.1,y,h*.34],[x+.42,y,h*.34],[x+.42,y,h*.5],[x+.1,y,h*.5]],f('74,22,20'))+pg([[x+w-.42,y,h*.34],[x+w-.1,y,h*.34],[x+w-.1,y,h*.5],[x+w-.42,y,h*.5]],f('74,22,20'))
+    +pg([[x+w*.36,y,h*.3],[x+w*.64,y,h*.3],[x+w*.64,y,h*.42],[x+w*.36,y,h*.42]],f('120,120,112'));
+  const weed=(x,y,s)=>`<g transform="${stand(x,y,1)}"><path d="M0 0 L${-14*s} ${-46*s} L${-3*s} ${-16*s} L${-2*s} ${-62*s} L${4*s} ${-20*s} L${15*s} ${-52*s} L${8*s} ${-8*s} L${24*s} ${-30*s} L10 0Z" fill="rgb(${s>1?'46,66,44':'38,56,40'})"/></g>`;
+  const [sx,sy]=xy(.3,5.6,0);
   return `<svg viewBox="0 0 640 360" role="img" aria-label="跡地の駐車場を映す定点カメラの映像">
-  <defs><radialGradient id="ltl" cx="88%" cy="20%" r="40%"><stop offset="0%" stop-color="rgb(120,110,80)" stop-opacity=".35"/><stop offset="100%" stop-color="#000" stop-opacity="0"/></radialGradient></defs>
-  <rect width="640" height="360" fill="rgb(14,16,24)"/>
-  ${[[0,50,90],[95,36,110],[210,60,80],[295,44,120],[420,58,90],[515,40,125]].map(([x,y,w])=>`<rect x="${x}" y="${y}" width="${w}" height="${118-y}" fill="rgb(24,26,32)"/>`).join('')}
-  <rect x="130" y="62" width="6" height="5" fill="rgb(110,100,70)"/><rect x="470" y="74" width="6" height="5" fill="rgb(110,100,70)"/>
-  <rect x="0" y="110" width="640" height="8" fill="rgb(40,40,46)"/>
-  <polygon points="40,118 600,118 640,262 0,262" fill="rgb(50,50,55)"/>
-  ${Array.from({length:11},(_,i)=>`<line x1="${top(i)}" y1="128" x2="${bot(i)}" y2="252" stroke="rgb(140,140,138)" stroke-width="2"/>`).join('')}
-  ${Array.from({length:10},(_,i)=>`<rect x="${top(i)+14}" y="124" width="24" height="5" fill="rgb(96,96,96)"/>`).join('')}
-  ${[2,5].map(i=>`<g><rect x="${(top(i)+bot(i))/2+6}" y="150" width="46" height="70" rx="10" fill="rgb(34,36,42)"/><rect x="${(top(i)+bot(i))/2+12}" y="164" width="34" height="18" rx="4" fill="rgb(24,26,30)"/></g>`).join('')}
-  <path d="M44 120 l4 -12 l3 12 M54 121 l5 -10 l2 11 M64 122 l3 -9 l3 9" stroke="rgb(60,86,58)" stroke-width="2" fill="none"/>
-  <rect x="0" y="262" width="640" height="98" fill="rgb(32,32,36)"/><rect x="0" y="262" width="640" height="4" fill="rgb(70,70,74)"/>
-  ${[0,1,2,3,4,5,6,7].map(i=>`<rect x="${i*90+20}" y="318" width="44" height="4" fill="rgb(120,118,96)"/>`).join('')}
-  ${o.flower?`<g><path d="M567 128 l1 -7" stroke="rgb(70,110,70)" stroke-width="1.2"/><circle cx="568" cy="120" r="3" fill="rgb(236,236,230)"/><circle cx="565" cy="122" r="2" fill="rgb(226,226,220)"/></g>`:''}
-  ${o.figure?`<g><path d="M575 168 Q560 166 556 150 Q556 134 572 130 Q590 128 594 146 Q596 164 585 170 Z" fill="rgb(108,110,114)"/><ellipse cx="575" cy="126" rx="9" ry="10" fill="rgb(46,42,40)"/><rect x="560" y="166" width="12" height="8" fill="rgb(30,30,34)"/><rect x="580" y="166" width="12" height="8" fill="rgb(30,30,34)"/></g>`:''}
-  <rect width="640" height="360" fill="url(#ltl)"/>
+  <defs>${camFx(id+'f',.15,.5)}${vignette(id+'v',.8)}
+   <filter id="${id}bl" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="4"/></filter>
+   <filter id="${id}b3" x="-10%" y="-200%" width="120%" height="500%"><feGaussianBlur stdDeviation="7"/></filter>
+   <linearGradient id="${id}sk" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="rgb(7,9,16)"/><stop offset="1" stop-color="rgb(30,29,34)"/></linearGradient>
+   <radialGradient id="${id}pl" gradientUnits="userSpaceOnUse" cx="${sx}" cy="${sy}" r="330" gradientTransform="translate(0 ${sy}) scale(1 .5) translate(0 ${-sy})"><stop offset="0" stop-color="rgb(236,196,112)" stop-opacity=".3"/><stop offset=".55" stop-color="rgb(236,196,112)" stop-opacity=".09"/><stop offset="1" stop-color="rgb(236,196,112)" stop-opacity="0"/></radialGradient>
+   <linearGradient id="${id}fd" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#000" stop-opacity=".62"/><stop offset=".5" stop-color="#000" stop-opacity=".2"/><stop offset="1" stop-color="#000" stop-opacity="0"/></linearGradient>
+   <linearGradient id="${id}ct" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="rgb(128,126,120)"/><stop offset="1" stop-color="rgb(70,70,72)"/></linearGradient>
+  </defs>
+  <g filter="url(#${id}f)">
+  <rect width="640" height="360" fill="url(#${id}sk)"/>
+  ${[[-30,-19,24,7],[-18,-8,27,9.5],[-7,3,23,6.5],[4,13,26,10],[14,24,22,7.5],[25,36,25,9]].map(([a,b,y,h],i)=>box(a,y,0,b,y+9,h,null,f('14,15,20'),f(i%2?'20,21,27':'17,18,24'))).join('')}
+  ${[[-14.5,27,5.4],[7.2,26,6.8],[17,22,4.2]].map(([x,y,z])=>pg([[x,y,z],[x+.8,y,z],[x+.8,y,z+.7],[x,y,z+.7]],f('92,82,54'))).join('')}
+  ${flr(-60,0,60,60,f('27,28,31'))}${flr(-60,5.5,60,6.25,f('58,58,56'))}${flr(-6.6,6.25,6.6,19.9,f('44,44,45'))}
+  ${flr(-6.6,11.6,6.6,14.4,'fill="rgb(38,38,39)"')}${[[-3,12.4,1.6,.9],[2.2,16.5,2.2,1.2],[-5,8.6,1.2,1.5]].map(([x,y,w,d])=>flr(x,y,x+w,y+d,'fill="rgb(34,34,36)" opacity=".8"')).join('')}
+  ${[0,1,2,3,4,5,6,7].map(i=>flr(-21+i*6,3.68,-18+i*6,3.82,f('120,120,112'))).join('')}
+  ${lines}${nums}${stops}
+  ${pg([[-6.6,19.9,0],[6.6,19.9,0],[6.6,19.9,1.3],[-6.6,19.9,1.3]],f('30,31,34'))}${Array.from({length:8},(_,i)=>pg([[-6.6+i*1.88,19.88,0],[-6.52+i*1.88,19.88,0],[-6.52+i*1.88,19.88,1.4],[-6.6+i*1.88,19.88,1.4]],f('64,66,68'))).join('')}
+  ${pg([[-6.6,6.3,0],[-6.6,19.9,0],[-6.6,19.9,1.1],[-6.6,6.3,1.1]],f('36,37,40'))}${pg([[6.6,6.3,0],[6.6,19.9,0],[6.6,19.9,1.1],[6.6,6.3,1.1]],f('40,41,44'))}
+  <g transform="${plane([-1.1,19.86,2.1],[1,0,0],[0,0,-1])}"><rect x="-6" y="-12" width="232" height="62" fill="rgb(118,118,112)"/><text x="110" y="34" text-anchor="middle" font-family="Zen Kaku Gothic New, sans-serif" font-weight="700" font-size="38" fill="rgb(28,34,60)">月極駐車場</text><rect x="20" y="50" width="6" height="150" fill="rgb(50,50,52)"/><rect x="194" y="50" width="6" height="150" fill="rgb(50,50,52)"/></g>
+  ${[[-6.2,19.5,1.5],[-5.5,19.6,1.1],[-6.3,18.6,1.2],[-4.7,19.7,.8],[-6.35,17.6,.8],[-3.6,19.75,.6],[5.9,19.7,.6]].map(w=>weed(...w)).join('')}
+  ${car(1.6,14.9,3.4,1.48,1.7,[112,114,112],'22,24,28')}
+  <rect width="640" height="360" fill="url(#${id}pl)"/>${flr(-60,6.3,60,60,`fill="url(#${id}fd)"`)}
+  ${car(-3.42,7.3,4.5,1.76,1.42,[30,32,38],'12,13,16')}
+  ${o.figure?`<g filter="url(#${id}bl)" opacity=".6">${flr(4.5,7.2,5.5,8.6,'fill="#000"')}</g>
+  <g transform="${stand(5,7.12,.98)}">
+   <path d="M-30 -30 L-36 -6 L-27 2 L-22 -22Z M30 -30 L36 -6 L27 2 L22 -22Z" fill="rgb(30,30,34)"/>
+   <path d="M-27 3 Q-31 -24 -24 -50 Q-21 -66 -9 -70 L9 -70 Q21 -66 24 -50 Q31 -24 27 3 Z" fill="url(#${id}ct)"/>
+   <path d="M-24 -50 Q-33 -38 -31 -24 L-25 -22 Q-25 -36 -19 -46Z M24 -50 Q33 -38 31 -24 L25 -22 Q25 -36 19 -46Z" fill="rgb(74,74,76)"/>
+   <path d="M0 -66 L0 0" stroke="rgb(74,74,76)" stroke-width="1.2"/>
+   <path d="M-22 -58 Q-12 -70 0 -71 Q12 -70 22 -58 Q10 -63 0 -63 Q-10 -63 -22 -58Z" fill="rgb(156,150,136)" opacity=".7"/>
+   <ellipse cx="0" cy="-81" rx="10.6" ry="11.4" fill="rgb(66,59,52)"/><ellipse cx="0" cy="-77" rx="9.6" ry="8" fill="rgb(40,36,33)"/><path d="M-11 -69 Q0 -62 11 -69 L10 -75 L-10 -75Z" fill="rgb(96,96,96)"/></g>`:''}
+  ${o.flower?`<g transform="${plane([5.9,7.1,.13],[.94,.34,0],[.34,-.94,0])}"><path d="M0 0 L3 -34" stroke="rgb(52,84,54)" stroke-width="1.6"/><path d="M1.4 -14 q7 -5 10 -1 q-5 4 -10 1z" fill="rgb(48,78,52)"/>
+   ${[0,72,144,216,288].map(a=>`<ellipse cx="3" cy="-44" rx="3.6" ry="6" transform="rotate(${a} 3 -38)" fill="rgb(${a%144?'218,216,204':'234,232,220'})"/>`).join('')}<circle cx="3" cy="-38" r="2.2" fill="rgb(170,150,84)"/></g>`:''}
+  <rect y="349" width="640" height="14" fill="rgb(240,196,100)" filter="url(#${id}b3)" opacity=".5"/>
+  <rect width="640" height="360" fill="url(#${id}v)"/>
+  </g>${camNoise(id+'f')}
  </svg>`;
 }
 // 週刊誌に載った防犯カメラの写真。背景のマンションは工事の足場とシートに覆われている
 function photoSVG(){
+  const id='vg'+(svgN++);
+  const P=camera([0,0,4.2],[2.4,12,1.1],420),{pg,box,plane,stand}=draw3d(P);
+  const f=c=>`fill="rgb(${c})"`,xy=(x,y,z)=>P(x,y,z).map(v=>+v.toFixed(1));
+  const flr=(x0,y0,x1,y1,attr)=>pg([[x0,y0,0],[x1,y0,0],[x1,y1,0],[x0,y1,0]],attr);
+  // 足場のシート。面は y=SY、幅 1.8m・高さ 1.7m のシートを継いである
+  const SY=16.4,sh=(x0,z0,x1,z1,attr)=>pg([[x0,SY,z0],[x1,SY,z0],[x1,SY,z1],[x0,SY,z1]],attr);
+  const cols=Array.from({length:11},(_,i)=>1.2+i*1.8),rows=[1.9,3.6,5.3,7,8.7,10.4];
+  const sheet=sh(1.2,1.9,21,11,`fill="url(#${id}sh)"`)
+    +cols.map((x,i)=>rows.slice(0,5).map((z,j)=>(i*7+j*5)%4<2?sh(x,z,x+1.8,z+1.7,`fill="#000" opacity="${((i*3+j)%3+1)*.035}"`):'').join('')).join('')
+    +cols.map(x=>sh(x-.03,1.9,x+.03,11,f('84,86,84'))).join('')+rows.map(z=>sh(1.2,z-.03,21,z+.03,f('88,90,88'))).join('')
+    +cols.map(x=>sh(x-.04,0,x+.04,1.9,f('92,94,92'))+pg([[x,17.3,0],[x+.07,17.3,0],[x+.07,17.3,1.9],[x,17.3,1.9]],f('52,54,54'))).join('')+sh(1.2,.95,21,1.02,f('84,86,84'))+sh(1.2,1.84,21,1.92,f('100,102,100'));
+  const [gx,gy]=xy(3.3,8.9,4.55),[px,py]=xy(3.2,8.6,0);
   return `<svg viewBox="0 0 640 360" role="img" aria-label="防犯カメラの映像。街灯の下を歩く灰色のコートの男。背景のマンションに工事の足場">
-  <defs><radialGradient id="pgl" cx="40%" cy="14%" r="45%"><stop offset="0%" stop-color="rgb(170,160,120)" stop-opacity=".45"/><stop offset="100%" stop-color="#000" stop-opacity="0"/></radialGradient></defs>
-  <rect width="640" height="360" fill="rgb(12,14,20)"/>
-  <rect x="330" y="30" width="310" height="232" fill="rgb(44,44,48)"/>
-  ${Array.from({length:10},(_,i)=>`<line x1="${334+i*34}" y1="26" x2="${334+i*34}" y2="262" stroke="rgb(96,96,92)" stroke-width="2"/>`).join('')}
-  ${Array.from({length:6},(_,i)=>`<line x1="330" y1="${40+i*44}" x2="640" y2="${40+i*44}" stroke="rgb(96,96,92)" stroke-width="2"/>`).join('')}
-  <rect x="330" y="30" width="310" height="232" fill="rgb(176,178,172)" opacity=".38"/>
-  <rect x="392" y="122" width="52" height="40" fill="rgb(38,38,42)" opacity=".9"/>
-  <text x="448" y="152" font-family="Zen Kaku Gothic New, sans-serif" font-weight="700" font-size="25" fill="rgb(44,62,108)">木工務店</text>
-  <text x="448" y="180" font-family="IBM Plex Mono, monospace" font-size="13" fill="rgb(44,62,108)">TEL 03-****-4721</text>
-  <rect x="0" y="150" width="200" height="112" fill="rgb(26,28,32)"/><rect x="0" y="146" width="200" height="6" fill="rgb(44,44,48)"/>
-  <polygon points="0,262 640,262 640,360 0,360" fill="rgb(30,30,32)"/><rect x="0" y="258" width="640" height="6" fill="rgb(58,58,60)"/>
-  <rect x="246" y="40" width="6" height="222" fill="rgb(60,60,64)"/><rect x="236" y="36" width="26" height="8" rx="3" fill="rgb(200,190,150)"/>
-  <rect x="226" y="150" width="46" height="18" fill="rgb(200,200,196)"/><text x="249" y="163" text-anchor="middle" font-family="Zen Kaku Gothic New, sans-serif" font-size="8" fill="rgb(40,40,40)">柚木台三丁目 7</text>
-  <g><ellipse cx="318" cy="168" rx="10" ry="12" fill="rgb(52,48,44)"/><path d="M303 182 Q318 174 333 182 L338 248 L298 248 Z" fill="rgb(112,114,118)"/><rect x="304" y="246" width="11" height="18" fill="rgb(26,26,30)"/><rect x="322" y="246" width="11" height="18" fill="rgb(26,26,30)"/></g>
-  <rect width="640" height="360" fill="url(#pgl)"/>
+  <defs>${camFx(id+'f',.17,.55)}${vignette(id+'v',.8)}
+   <filter id="${id}bl" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="5"/></filter>
+   <filter id="${id}b2" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="1.2"/></filter>
+   <linearGradient id="${id}sh" x1="0" y1="1" x2=".9" y2="0"><stop offset="0" stop-color="rgb(168,170,164)"/><stop offset=".45" stop-color="rgb(120,122,120)"/><stop offset="1" stop-color="rgb(66,68,70)"/></linearGradient>
+   <radialGradient id="${id}pl" gradientUnits="userSpaceOnUse" cx="${px}" cy="${py}" r="190" gradientTransform="translate(0 ${py}) scale(1 .42) translate(0 ${-py})"><stop offset="0" stop-color="rgb(226,222,198)" stop-opacity=".42"/><stop offset=".5" stop-color="rgb(226,222,198)" stop-opacity=".13"/><stop offset="1" stop-color="rgb(226,222,198)" stop-opacity="0"/></radialGradient>
+   <radialGradient id="${id}gw"><stop offset="0" stop-color="rgb(255,252,236)"/><stop offset=".12" stop-color="rgb(250,244,214)" stop-opacity=".85"/><stop offset=".4" stop-color="rgb(230,224,190)" stop-opacity=".22"/><stop offset="1" stop-color="rgb(230,224,190)" stop-opacity="0"/></radialGradient>
+   <linearGradient id="${id}pk" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="rgb(40,41,42)"/><stop offset=".7" stop-color="rgb(98,98,94)"/><stop offset="1" stop-color="rgb(70,70,68)"/></linearGradient>
+   <linearGradient id="${id}ct" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="rgb(104,106,108)"/><stop offset=".25" stop-color="rgb(78,80,84)"/><stop offset="1" stop-color="rgb(46,48,52)"/></linearGradient>
+  </defs>
+  <g filter="url(#${id}f)">
+  <rect width="640" height="360" fill="rgb(9,11,16)"/>
+  ${[[-22,-12,24,6.5],[-11,-4,22,7.5],[-30,-23,26,8]].map(([a,b,y,h])=>box(a,y,0,b,y+8,h,null,null,f('17,19,24'))+pg([[b,y,0],[b,y+8,0],[b,y+8,h],[b,y,h]],f('13,14,19'))).join('')}
+  ${pg([[-9.9,22,3.5],[-9.2,22,3.5],[-9.2,22,4.3],[-9.9,22,4.3]],f('104,92,60'))}
+  ${flr(-40,0,40,40,f('25,26,29'))}${flr(-40,13.6,40,16.2,f('29,30,33'))}
+  <ellipse cx="${px}" cy="${py}" rx="190" ry="80" fill="url(#${id}pl)"/>
+  ${flr(-2.05,1,-1.92,13.4,f('86,86,82'))}${flr(5.55,1,5.68,13.4,f('82,82,78'))}${flr(-1.9,12.7,2.2,13.1,f('112,112,106'))}
+  <g transform="${plane([-1.5,11.4,0],[1,0,0],[0,-1,0])}"><text font-family="Zen Kaku Gothic New, sans-serif" font-weight="700" font-size="100" transform="scale(1 2.4)" fill="rgb(104,104,98)">止まれ</text></g>
+  <g transform="${plane([1.4,5.6,0],[1,0,0],[0,-1,0])}"><circle r="32" fill="rgb(38,39,41)"/><circle r="27" fill="none" stroke="rgb(26,27,29)" stroke-width="3"/></g>
+  ${pg([[1.5,17,0],[1.5,27,0],[1.5,27,11],[1.5,17,11]],f('46,48,50'))}${pg([[1.5,17,0],[21,17,0],[21,17,11],[1.5,17,11]],f('16,17,20'))}
+  ${sheet}
+  ${sh(5.1,3.3,7.62,7.1,f('30,44,66'))}${sh(5.1,3.3,7.62,3.42,f('20,32,52'))}${[5.7,6.4,7.1].map((x,i)=>sh(x,3.3,x+.05,7.1,`fill="rgb(${i%2?'44,62,92':'20,32,54'})"`)).join('')}
+  <g transform="${plane([7.76,SY,4.42],[1,0,0],[0,0,-1])}" fill="rgb(34,48,88)" filter="url(#${id}b2)">
+   <text font-family="Zen Kaku Gothic New, sans-serif" font-weight="700" font-size="104">木工務店</text>
+   <text y="74" font-family="IBM Plex Mono, monospace" font-weight="500" font-size="49" letter-spacing="-1.5">TEL 03-****-4721</text></g>
+  ${pg([[-2.4,2,0],[-2.4,13.4,0],[-2.4,13.4,1.55],[-2.4,2,1.55]],f('58,58,56'))}${pg([[-2.4,2,1.55],[-2.4,13.4,1.55],[-2.6,13.4,1.55],[-2.6,2,1.55]],f('80,80,76'))}
+  ${[.4,.8,1.2].map(z=>pg([[-2.4,2,z],[-2.4,13.4,z],[-2.4,13.4,z+.02],[-2.4,2,z+.02]],f('44,44,43'))).join('')}
+  ${box(9.8,2,0,17,12,4.3,null,f('24,25,28'),f('18,19,22'))}${box(6.3,1,0,6.5,12.8,1.6,f('66,66,63'),f('48,48,47'),f('40,40,39'))}
+  <g filter="url(#${id}bl)" opacity=".7">${pg([[2.15,6.3,0],[2.75,6.5,0],[2.0,4.2,0],[1.2,4.4,0]],'fill="#000"')}</g>
+  <g transform="${stand(4.5,9.2,4.7)}"><rect x="-5" y="-470" width="10" height="470" fill="url(#${id}pk)"/></g>
+  <path d="M${xy(4.5,9.2,4.7)} L${xy(3.4,8.9,4.72)}" stroke="rgb(64,64,62)" stroke-width="2.2"/>
+  <g transform="${stand(2.45,6.4,1.74)}">
+   <path d="M-13 -62 L-15 -30 L-17 -2 L-7 -1 L-3 -34 L0 -62Z" fill="rgb(22,22,26)"/><path d="M1 -62 L6 -32 L12 -4 L22 -6 L15 -36 L13 -62Z" fill="rgb(26,26,30)"/>
+   <path d="M-23 3 L-6 3 L-7 -3 L-18 -4Z M10 0 L27 -3 L24 -9 L13 -7Z" fill="rgb(12,12,14)"/>
+   <path d="M-7 -152 Q-21 -149 -23 -136 L-25 -96 L-21 -58 L20 -58 L24 -96 L23 -136 Q21 -149 8 -152 L4 -156 L-3 -156Z" fill="url(#${id}ct)"/>
+   <path d="M-23 -136 L-27 -98 L-24 -84 L-18 -86 L-19 -100 L-17 -128Z M23 -136 L27 -100 L24 -86 L18 -88 L19 -102 L18 -128Z" fill="rgb(84,86,90)"/>
+   <path d="M0 -150 L1 -60" stroke="rgb(72,74,78)" stroke-width="1.2"/><path d="M-9 -153 Q0 -146 9 -153 L8 -158 L-8 -158Z" fill="rgb(92,94,98)"/>
+   <ellipse cx="1" cy="-163" rx="9.6" ry="10.2" fill="rgb(30,27,25)"/><ellipse cx="0" cy="-168" rx="7" ry="5" fill="rgb(62,58,54)"/>
+   <path d="M-20 -150 Q0 -160 20 -150 L18 -146 Q0 -155 -18 -146Z" fill="rgb(170,172,170)" opacity=".3"/>
+  </g>
+  <g transform="${stand(-1.25,4.5,9)}"><rect x="-15" y="-900" width="30" height="900" fill="url(#${id}pk)"/>
+   ${[0,1,2,3,4,5].map(i=>`<rect x="-15.4" y="${-178+i*15}" width="30.8" height="15" fill="rgb(${i%2?'18,18,18':'118,102,36'})"/>`).join('')}
+   <rect x="-7.5" y="-268" width="15" height="64" fill="rgb(20,74,58)" stroke="rgb(170,176,170)" stroke-width=".8"/>
+   <g font-family="Zen Kaku Gothic New, sans-serif" font-weight="700" font-size="7.4" fill="rgb(206,210,204)" text-anchor="middle">${[...'柚木台三丁目'].map((c,i)=>`<text y="${-259+i*8}">${c}</text>`).join('')}<text y="-207.5" font-size="9.4" font-family="IBM Plex Mono, monospace">7</text></g>
+   <rect x="-17" y="-560" width="34" height="5" fill="rgb(40,40,40)"/></g>
+  <path d="M${xy(-1.25,4.5,7.6)} Q${xy(8,10,6.2)} ${xy(22,16,8.2)} M${xy(-1.25,4.5,7.2)} Q${xy(8,10,5.8)} ${xy(22,16,7.7)} M${xy(-1.25,4.5,7.6)} Q${xy(-8,10,6.6)} ${xy(-16,22,8)}" stroke="rgb(5,5,7)" stroke-width="1" fill="none"/>
+  <rect x="${gx-9}" y="${gy-2.5}" width="16" height="5" rx="2" fill="rgb(60,60,60)"/>
+  <circle cx="${gx}" cy="${gy+2}" r="70" fill="url(#${id}gw)"/>
+  <rect width="640" height="360" fill="url(#${id}v)"/>
+  </g>${camNoise(id+'f')}
  </svg>`;
 }
 // 来客用の回線を通ったデータ量（1分ごと、03:30〜05:30）。動きがあるとカメラの送る量が増える
@@ -1145,7 +1437,7 @@ function initNet(el){
   const box=el.querySelector('#netbox'),cap=el.querySelector('#netcap');let day='10/10';
   const draw=()=>{box.innerHTML=netSVG(day);cap.textContent=`${day} の夜。グラフをタップすると、その時刻の送信量が出る。`;
    box.querySelector('svg').onclick=e=>{const r=e.currentTarget.getBoundingClientRect(),i=Math.max(0,Math.min(120,Math.round(((e.clientX-r.left)/r.width*640-30)/(600/121))));cap.textContent=`${day} ${netTime(i)} ・ ${netData(day)[i]} KB/分`}};
-  el.querySelectorAll('[data-day]').forEach(b=>b.onclick=()=>{day=b.dataset.day;el.querySelectorAll('[data-day]').forEach(x=>x.classList.toggle('on',x===b));draw()});
+  el.querySelectorAll('[data-day]').forEach(b=>b.onclick=()=>{day=b.dataset.day;if(day==='10/11')react('net',['','誰もいないはずの夜に、山が二つある。']);el.querySelectorAll('[data-day]').forEach(x=>x.classList.toggle('on',x===b));draw()});
   draw();
 }
 // Web 検索（第四章）。語をすべて含む結果を出す
@@ -1237,7 +1529,8 @@ const CH2=[
    why:i=>i===0?'窓の上からでは、窓は映らない。映像では、窓が奥に見えている。':i===2?'給湯室の中からでは、私の机も透さんの椅子も壁にさえぎられる。':'映像は、部屋全体を少し高いところから見下ろしている。',
    memo:'カメラは入口の上の角。半年前の合同調査で、二週間ほど捜査員が事務所に詰めていた。それ以外に、奥まで入った人はいない。'}
  ],
- hints:['録画に映った車の台数を、首都高の交通量の表と比べよう。トラックが少ない夜は一つではない。','「事務所の記録」で、窓辺の花と透さんのスマホがいつ事務所にあったかを確かめる。録画の透さんの机の上を拡大しよう。','映像は、私の机と透さんの椅子と窓を、少し高いところから一度に見下ろしている。窓が奥に見えるのは、どこから撮ったときか。'],
+ hints:[['録画に映った車の台数を、「交通量」の表と比べよう。トラックが少ない夜は一つではない。','「事務所の記録」で、窓辺の花と透さんのスマホがいつ事務所にあったかを確かめる。録画の透さんの机の上を拡大しよう。'],
+  ['映像は、私の机と透さんの椅子と窓を、少し高いところから一度に見下ろしている。窓が奥に見えるのは、どこから撮ったときか。']],
  solved:`<p>映像は<b>10月11日（土）</b>の午前3時33分からの11分間。真壁さんが殺された夜だ。透さんの机の上には、まだスマホがある。</p>
  <p>カメラは<b>入口の上の角</b>。給湯室の鏡で確かめると、火災報知器の横に黒い点が一つあった。三月の空調の点検のときには、なかったものだ。</p>
  <p>見られている、と知らせるために、誰かがこの映像を私に見せた。透さんが「架純には連絡するな」と書いた意味が、少しだけわかった気がした。</p>`,
@@ -1280,7 +1573,9 @@ const CH2=[
    traps:[[/shikimi|hinoki|kusu|tsubaki|樒|檜|楠|椿/,'それは中継の一つの名前。並んだ名前の中に、一つだけ違うものがある。'],[/灯籠|とうろう/,'URLを送ってきたのは灯籠のアカウント。でも、組んだ人の癖は別のところに出ている。']],
    memo:'中継の名前は木の名前（樒・檜・楠・椿）で、最後だけ英語の holly。映像の取り込み元は、弱点の知られたカメラ用クラウド（NC330 系）。高校生のころ、夜中の掲示板で知っていた名前。「足跡が残ってる。癖は消せないよ」と、一度だけ私に書いてきた。'}
  ],
- hints:['投稿の時刻と、メッセージの時刻を並べよう。投稿元も見る。','透さんの書き方は隠していない癖で、誰でも真似できる。それでも本人が「。」で書いた理由は？','端末で whois utsuro.tv と trace utsuro.tv。中継の名前の付け方に、組んだ人の癖が出る。'],
+ hints:[['投稿の時刻と、メッセージの時刻を並べよう。投稿元も見る。','選ぶのは「本人が書いた」と言える根拠だけ。誰にでも当てはまることは根拠にならない。'],
+  ['1分前、透さんは私あてに「．」で書いている。それでも投稿だけを「。」にした理由は？'],
+  ['端末で whois utsuro.tv と trace utsuro.tv を打とう。','中継の名前の付け方に、組んだ人の癖が出る。一つだけ違う名前は？']],
  solved:`<p>投稿は、私あての二通の直後に、同じスマホから出ていた。書いたのは透さん本人で、自分の書き方をわざと外している。<b>透さんは、書かされた</b>。</p>
  <p>うつろ放送の中継には、木の名前が並んでいた。樒、檜、楠、椿、そして <b>holly</b>。透さんに見つかる前、夜中の掲示板で何度も見た名前だった。</p>
  <p>灯籠さんのアカウントに、一行だけ返した。木の名前で、気づきました。返事は二時間後に来た。</p>`,
@@ -1320,7 +1615,9 @@ const CH2=[
    why:sel=>sel.includes(3)?'十年分、同じ時刻に同じ男が映っている。作り物だと言える材料はない。':sel.includes(4)?'そんな話は、柊さんの話のどこにも出てこない。':'まだある。「柊さんの話」をもう一度読もう。',
    memo:'不在証明を出せば、灯籠が宮下誠一だったこと、十年前の録画の出どころが「遼さんのパソコンのコピー」ではなかったことが明るみに出る。証拠を受け取るのは、サイバー犯罪対策課。透さんはそれを知っていて黙っている。'}
  ],
- hints:['定点カメラの 2036 年の行を見よう。透さんが映っていた時間は？','駐車場に来た時刻と去った時刻を、時刻表の終電・始発と比べよう。','「柊さんの話」で、柊さんが何を恐れているかを確かめよう。'],
+ hints:[['「定点カメラ」の 2036 年の行を見よう。透さんが映っていた時間は？'],
+  ['駐車場に来た時刻と去った時刻を、「時刻表」の終電・始発と比べよう。駅から跡地までは歩いて10分ほど。'],
+  ['「柊さんの話」の「いま」を読もう。柊さんは何を恐れているか。']],
  solved:`<p>真壁さんが殺された4時半ごろ、透さんは<b>月見台の跡地</b>にいた。毎年、終電で来て始発で帰る。十年前、水野遼さんが乗れなかった始発だ。</p>
  <p>それでも、この映像は出せない。出せば、十年前の録画の本当の出どころが明るみに出て、当時その説明に加わった架純さんも警察にいられなくなる。「篠宮さんは、全部わかっていて黙ってるんだと思う。父との約束を、まだ守ってる」。</p>
  <p>柊さんは、置いた花を見下ろした。トルコキキョウ。沙耶さんが好きだった花だという。</p>`,
@@ -1361,8 +1658,11 @@ const CH2=[
    why:i=>i===1?'透さんが真壁さんの家を出たのは、日付が変わってから。映像は 9/28 のものだ。':'保存期間は30日。撮られた日から数えよう。',
    memo:'元の映像は 9/28 の午前0時台のもの。30日後の 10/28 に消える。'}
  ],
- hints:['写真を拡大すると、足場のシートに会社名の後半と、電話番号の下4桁が読める。','「検索」で会社の工期と、近所の人の投稿を探そう（例：木工務店 4721、足場 柚木台）。','事務所の予定表で、透さんが真壁さんの家に行った日を探す。防犯カメラの保存期間は、マンションの案内に書いてある。'],
- solved:`<p>写真は10月1日より前、<b>9月28日の午前0時台</b>に撮られたものだった。前の晩、透さんは真壁さんの家を訪ねていた。誰かが、その映像の日付を10月11日に書き換えた。預かった証拠を最初に調べるのは、サイバー犯罪対策課だ。</p>
+ hints:[['写真を拡大すると、足場のシートに会社名の後半と、電話番号の下4桁が読める。','「検索」で、その二つを空白で区切って探そう（例：木工務店 4721）。'],
+  ['工期の終わりは予定にすぎない。「検索」で、近所の人の投稿を探そう（例：足場 柚木台）。'],
+  ['「予定表」で、透さんが真壁さんの家に行った日を探そう。'],
+  ['防犯カメラの保存期間は、マンションの案内に書いてある（「検索」で、防犯カメラ 柚木台）。','透さんが真壁さんの家を出たのは、日付が変わってから。そこから30日を数えよう。']],
+ solved:`<p>写真は10月1日より前、<b>9月28日の午前0時台</b>に撮られたものだった。前の晩、透さんは真壁さんの家を訪ねていた。誰かが、その映像の日付を10月11日に書き換えた。預かった証拠を最初に調べるのは、サイバー犯罪対策課だ。その課で透さんの事件を担当しているのは、水野警部補。「架純には連絡するな」が、初めて別の意味に読めた。巻き込むな、ではなく、信じるな、という意味に。</p>
  <p>その夜、私はもう一度、線を越えた。警備会社のサーバーには元の映像が残っていた。9月28日の午前0時37分、足場の前を歩く透さん。10月11日の4時21分の同じ角には、誰も歩いていない。</p>
  <p>私は何もコピーしなかった。違法に手に入れたものは、証拠にならない。元の映像が消えるのは、10月28日の午前0時37分。これを正しく残せるのは、私ではない。</p>`,
  apps:[
@@ -1399,9 +1699,11 @@ const CH2=[
    why:()=>'その言葉なら、誰が言ってもおかしくない。「事務所メモ」で、私がここに来た経緯がどう紹介されていたか確かめよう。',
    memo:'「見つけてきた」は、九月の終わりの夜、この部屋で透さんが口にしただけの言葉。榊原は、天井のカメラで聞いていた。'}
  ],
- hints:['端末で trace utsuro.tv をしたときの「取り込み元」の種類を思い出そう。回線の記録の機器一覧にある。','グラフの日付を 10/11 にして、山をタップすると時刻が出る。03:33〜03:44 は、柊さんが流した11分間。','事務所メモで、合同調査のときに私がどう紹介されたか、九月の終わりの夜に透さんが何と言ったかを確かめよう。'],
+ hints:[['第二章の端末で見た「取り込み元」のカメラの種類（NC330 系）を、「回線の記録」の機器一覧から探そう。'],
+  ['グラフの日付を 10/11 にして、山をタップすると時刻が出る。','03:33〜03:44 は、柊さんが流した11分間。そのあとの最初の山は？'],
+  ['「事務所メモ」で、合同調査のときに私がどう紹介されたか、九月の終わりの夜に透さんが何と言ったかを確かめよう。']],
  solved:`<p>カメラは<b>4月14日</b>、合同調査の初日から来客用の回線につながっていた。10月11日の<b>3時52分</b>と5時14分、無人の事務所で何かが動いた。透さんのスマホが持ち出され、戻された時刻だ。</p>
- <p>「見つけてきた」。私がここに来た経緯を、透さんは誰にも話していない。あの言葉を聞いたのは、九月の終わりの夜、この部屋でだけだ。七月の夜には、十年前の録画の本当の出どころの話もした。</p>
+ <p>「見つけてきた」。私がここに来た経緯を、透さんは誰にも話していない。あの言葉を聞いたのは、九月の終わりの夜、この部屋でだけだ。七月の夜には、十年前の録画の本当の出どころの話もした。そして十月のはじめ、十一日の夜はスマホを置いていくのかと聞いたのは、私だった。真壁さんが遼さんの命日と同じ日に殺されたのは、偶然ではない。その夜しか、なかったのだ。</p>
  <p>透さんの弱みは、一つではなかった。不在証明を出せば宮下家と十年前の録画に行き着き、架純さんは警察にいられなくなる。口を開けば、次は私の名前が出る。透さんは、架純さんと私を守るために黙っている。</p>
  <p>私は、透さんの言いつけを一つだけ破ることにした。</p>`,
  apps:[
@@ -1417,7 +1719,8 @@ const CH2=[
   {id:'memo2',name:'事務所メモ',icon:'doc',title:'事務所メモ',w:480,h:470,html:`<div class="doc"><div class="meta">合同調査（警視庁サイバー犯罪対策課）</div>4/14（月）〜4/25（金）。捜査員が事務所に詰める。来客用の回線を用意した。<br>事務所の鍵を1本貸し出し（4/14）、返却（4/25）。</div>
    <div class="doc"><div class="meta">捜査員への紹介（4/14）</div>春日：高校生のころから手伝っているアルバイト上がり。</div>
    <div class="doc draft"><div class="meta">私の記憶 ・ 7月の終わりの夜</div>透さん「出さないって約束したんだ。あの録画は、遼さんのパソコンにあったコピーとして警察に出した。本当の持ち主がいることを知ってるのは、俺と架純だけだ」</div>
-   <div class="doc draft"><div class="meta">私の記憶 ・ 9月の終わりの夜（四年前、透さんが私の部屋のドアを叩いた日）</div>透さん「四年前にお前を見つけたのが俺でよかったな。お前が告発した会社の件、被害届はまだ生きてるからな。サイバー犯罪対策課の棚に、未解決のまま積んである」</div>`}
+   <div class="doc draft"><div class="meta">私の記憶 ・ 9月の終わりの夜（四年前、透さんが私の部屋のドアを叩いた日）</div>透さん「四年前にお前を見つけたのが俺でよかったな。お前が告発した会社の件、被害届はまだ生きてるからな。サイバー犯罪対策課の棚に、未解決のまま積んである」</div>
+   <div class="doc draft"><div class="meta">私の記憶 ・ 10月のはじめの昼</div>私「今年も、十一日の夜はスマホを置いていくんですか」<br>透さん「ああ。置いていく」</div>`}
  ]
 },
 {
@@ -1442,14 +1745,16 @@ const CH2=[
    why:i=>i===0?'まだ証拠が足りない。問いただせば、向こうは先に手を打つ。':i===2?'外してしまえば、持ち主がここに来る理由がなくなる。':'名前を流しても、証拠にはならない。',
    memo:'「明日、業者に天井を見てもらう」とカメラに聞かせれば、持ち主は今夜のうちに外しに来るしかない。製造番号から持ち主にたどり着くから。'}
  ],
- hints:['正規の証拠にできるのは、誰でも確かめられるものか、持ち主が自分から差し出せるものだ。','映像の保存期間は30日。撮られたのは 9/28 の午前0時37分。','持ち主にとって、外されて調べられると困るものは何か。'],
+ hints:[['正規の証拠にできるのは、誰でも確かめられるものか、持ち主が自分から差し出せるものだ。'],
+  ['映像の保存期間は30日。撮られたのは 9/28 の午前0時37分。'],
+  ['持ち主にとって、外されて調べられると困るものは何か。そのことを、どうやって持ち主に知らせるか。']],
  solved:`<p>「九月二十八日の、零時三十七分」と架純さんは繰り返した。「そこまでは、案内にも予定表にも書いてない」。私は答えなかった。架純さんは、ふっと視線を外した。「<b>聞かないでおく</b>」。</p>
  <p>柊さんが名乗った。「十年前、灯籠という名前で録画を渡したのは、僕の父です。宮下沙耶の、父親です」。架純さんは目を閉じて、小さく笑った。「あの人、また私をかばったのね」。</p>
  <p>月曜日、架純さんは十年前の録画の出どころを自分から申し出て、榊原を通さずに令状を取る。柊さんは父の名前を出すと決めた。そして天井のカメラには、外しに来てもらう。</p>`,
  apps:[{id:'evid',name:'手元の証拠',icon:'doc',title:'手元にあるもの',w:560,h:440,html:evidCards()},lotApp]
 },
 {
- id:7,no:'第七章',title:'入口の上',theme:'y2036',mark:'SHINOMIYA RESEARCH',next:'調査を終える',clock:'2036/10/28 03:41',where:'篠宮リサーチ 事務所',
+ id:7,no:'第七章',title:'入口の上',theme:'y2036',mark:'SHINOMIYA RESEARCH',foe:'榊原',retreat:'……話は済んだかな、春日さん。それなら、私は失礼するよ。',next:'調査を終える',clock:'2036/10/28 03:41',where:'篠宮リサーチ 事務所',
  narr:[['','10月27日、月曜日の夕方。事務所の電話が鳴った。「篠宮さんのお宅でしょうか」。違います、と答えると、電話は切れた。架純さんと決めておいた合図だ。警備会社の映像は、令状で押さえられた。'],
   ['','私はもう一度受話器を取った。今度は、天井のカメラに聞かせるための電話だ。入口の上の角に、見覚えのない機械が付いている。明日の朝いちばんに、業者さんに見てもらえませんか。'],
   ['','零時過ぎ、架純さんと捜査本部の刑事が二人、明かりを点けずに入った。カメラは入口の上から部屋の奥を見下ろしている。入口のすぐ下だけは映らない。'],
@@ -1459,26 +1764,30 @@ const CH2=[
  steps:[
   {type:'choice',tag:'対決 1',q:'<span class="say">榊原</span>私は捜査で来ている。この事務所に不審な機器があると聞いてね。証拠が持ち出される前に、確保しに来た。<br>どの事実で崩す？',
    options:['天井の機械の話は、夕方に事務所の中の電話でしかしていない','カメラは 4/14 から来客用の回線につながっていた','週刊誌の写真には、工事の足場が写っている','透さんは毎年、終電で来て始発で帰る'],answer:0,
-   why:()=>'それは、今夜ここに来た理由を崩さない。「不審な機器がある」と、榊原はどこで聞いたのか。',
+   why:()=>'榊原「それが、私が今夜ここにいることと、どうつながるのかな」 ― 「不審な機器がある」と、榊原はどこで聞いたのか。',
    memo:'天井の機械の話は、夕方、事務所の中でしかしていない。聞けたのは、カメラの向こうにいた人間だけ。'},
   {type:'choice',tag:'対決 2',q:'<span class="say">榊原</span>十月十一日の夜？ 篠宮さんが自分で、事務所にスマホを取りに戻ったんだろう。<br>どの事実で崩す？',
    options:['3:52 と 5:14 に、無人の事務所で送信量が跳ね上がった','その時間、透さんは月見台の跡地にいた（定点カメラ 0:14〜4:47）','投稿は、私あての二通の直後に出ている','カメラのクラウドの録画は、3:45 から 5:20 まで消されていた'],answer:1,
-   why:()=>'それは、誰かが動いたことは示しても、それが透さんでないことは示さない。',
+   why:()=>'榊原「誰かが動いた。それが篠宮さんではないと、どうして言える」',
    memo:'その時間、透さんは月見台の跡地にいた。そこにカメラがあることを、透さんは知っていた。'},
   {type:'choice',tag:'対決 3',q:'<span class="say">榊原</span>防犯カメラには、真壁さんの家の近くを歩く篠宮さん本人が映っていた。<br>どの事実で崩す？',
    options:['写真の背景の足場は、10月1日にはもう撤去されていた','写真はピントが甘く、顔が見えない','透さんは真壁さんの情報源だった','真壁さんの家から事務所までは車で20分かかる'],answer:0,
-   why:i=>i===1?'映っているのは、確かに透さん本人だ。違うのは日付のほう。':'それでは、その夜に透さんがそこにいなかったことにはならない。',
+   why:i=>i===1?'榊原「顔が見えなくても、本人だよ。君がいちばんよくわかっているだろう」 ― 映っているのは、確かに透さん本人だ。違うのは日付のほう。':'榊原「それで、あの夜に彼がそこにいなかったことになるのかね」',
    memo:'防犯カメラの映像は 9/28 のもの。日付が 10/11 に書き換えられていた。'},
   {type:'choice',tag:'対決 4',q:'<span class="say">榊原</span>日付を書き換えた？ 預かった映像に、そんな跡がどこにある。<br>どの事実で崩す？',
    options:['令状で押さえた警備会社の元の映像では、10/11 4:21 の角に誰もいない','私が警備会社のサーバーで見た元の映像','預かった映像を最初に調べるのは、サイバー犯罪対策課だ','透さんは真壁さんの家に、9/27 の夜に行っている'],answer:0,
-   why:i=>i===1?'それは線を越えて見たものだ。ここで出せば、証拠でなくなる。':'それだけでは、書き換えがあったことを示せない。',
+   why:i=>i===1?'それは線を越えて見たものだ。ここで出せば証拠でなくなり、榊原の思うつぼになる。':'榊原「それは、書き換えがあったという証拠ではないね」',
    memo:'令状で押さえた元の映像では、10/11 04:21 の角には誰もいない。猫が一匹、横切っただけ。'},
   {type:'text',tag:'最後',q:'<span class="say">榊原</span>……私がこの事務所に入った証拠など、どこにもない。<br>何を出させる？',
    check:v=>/ポケット|合鍵|鍵|かぎ/.test(v),
    traps:[[/カメラ|天井/,'カメラはもう天井にない。榊原は、外したものをどこにしまった？'],[/スマホ|携帯|靴|手袋/,'榊原がドアを開けるのに使ったものは？']],
    memo:'榊原のポケットには、外したばかりのカメラと、四月に作った事務所の合鍵。'}
  ],
- hints:['榊原の言い分ごとに、捜査ノートの「わかったこと」を見返そう。','対決4では、正規の証拠だけを使う。線を越えて見たものは出せない。','最後は、榊原がドアを開けるのに使ったものと、天井から外したもの。どこにしまった？'],
+ hints:[['「不審な機器がある」と、榊原はどこで聞いたのか。'],
+  ['誰かが動いたことではなく、それが透さんではないことを示す事実は？'],
+  ['映っているのは透さん本人だ。違うのは日付のほう。第四章で、何から割り出したか。'],
+  ['正規の証拠だけを使う。線を越えて見たものは出せない。'],
+  ['榊原がドアを開けるのに使ったものと、天井から外したもの。どこにしまった？']],
  solved:`<p>「ログは嘘をつかない。嘘をつくのは、ログを読む人間だ」と私は言った。「透さんの口癖です。この事件のログを最初に読んだのは、あなたでした」</p>
  <p>給湯室の戸が開いた。「榊原警部。住居侵入の現行犯で、逮捕します。ポケットの中の物も、お預かりします」。架純さんの声は、震えていなかった。</p>`,
  apps:[{id:'evid',name:'手元の証拠',icon:'doc',title:'手元にあるもの',w:560,h:440,html:evidCards(4)+`<div class="card" style="margin-top:10px"><b>令状で押さえた元の映像</b>警備会社のサーバーの 9/28 00:37 と 10/11 04:21。架純さんが 10/27 に正規に押さえた。</div>`}]
@@ -1497,7 +1806,7 @@ function ending2(){
    </div>
    <div class="present">
     <p>警察署の前で、透さんは私の顔を見て、最初にこう言った。「読んだか」。読みました、全部、と私は答えた。</p>
-    <p>「全部俺がやった、の『。』。気づくと思ってましたか」「お前なら気づくと思った」。架純さんも気づいてました、と言うと、透さんは少しのあいだ黙った。「そうか」。</p>
+    <p>「全部俺がやった、の『。』。気づくと思ってましたか」「お前なら気づくと思った。黙っているあいだに、お前が読み終わるとも」。あきらめて黙ったのではなかった。透さんは、私に賭けていたのだ。架純さんも気づいてました、と言うと、透さんは少しのあいだ黙った。「そうか」。</p>
     <p>駅の手前の花屋で、私は白い花の名前を教えた。トルコキキョウ。透さんは十年間、名前を知らないまま、同じ花を買っていた。</p>
     <p>その夜、事務所でメッセージが一通届いた。机の向こうの椅子に、透さんが座っているのに。</p>
     <p class="mono">ミオ．明日から報告書の清書，頼む．</p>
@@ -1508,6 +1817,7 @@ function ending2(){
    </div>
    <div class="teaser"><div class="eyebrow" style="color:#8fa4c9">その先</div>
     <p>取り調べの最後に、榊原は一つだけ聞き返したという。篠宮のところの若いのは、元気にしているか。四年前の未解決の事件の資料は、今も榊原の課の棚に積まれたままだ。</p></div>
+   ${recordHTML()}
    <p class="cap">試作版はここまでです。</p>
    <div class="endbtns"><button type="button" class="back" id="endTitle">タイトルに戻る</button><button type="button" class="back" id="endBack">デスクトップに戻る</button></div></div>`;
 }
@@ -1522,7 +1832,7 @@ const EPS={
 };
 
 // ===== 状態 =====
-const fresh=()=>({cur:0,done:{},hints:{},nr:{},seen:{}});
+const fresh=()=>({cur:0,done:{},hints:{},nr:{},seen:{},miss:0});
 let EP=1,CH=CH1,KEY=EPS[1].key,S=fresh();
 function loadSave(n){
   try{const s=JSON.parse(localStorage.getItem(EPS[n].key)||'null');if(s&&Number.isInteger(s.cur)&&s.cur>=0&&s.cur<EPS[n].ch.length&&s.done)return Object.assign(fresh(),s)}catch(e){}
@@ -1555,45 +1865,68 @@ function stepHTML(c,st,i){
   if(st.type==='text')body=`<form class="ans" data-s="${i}"><input type="text" id="in-${c.id}-${i}" name="search-answer" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" aria-label="回答" placeholder="答えを入力"><button class="btn" type="submit">回答する</button></form>`;
   if(st.type==='choice')body=`<form data-s="${i}"><div class="opts">${st.options.map((o,j)=>`<label for="in-${c.id}-${i}-${j}"><input type="radio" name="r-${c.id}-${i}" id="in-${c.id}-${i}-${j}" value="${j}">${o}</label>`).join('')}</div><button class="btn" type="submit">${st.tag?.startsWith('対決')?'突きつける':'回答する'}</button></form>`;
   if(st.type==='multi')body=`<form data-s="${i}"><div class="opts">${st.options.map((o,j)=>`<label for="in-${c.id}-${i}-${j}"><input type="checkbox" id="in-${c.id}-${i}-${j}" value="${j}">${o}</label>`).join('')}</div><button class="btn" type="submit">回答する</button></form>`;
-  return `<div class="task">${n}<div class="q">${st.q}</div>${body}<div class="feedback" id="fb-${i}"></div></div>`;
+  return `<div class="task">${n}<div class="q">${st.q}</div>${body}<div class="feedback" id="fb-${i}"></div>${hintsHTML(c,i)}</div>`;
+}
+// ヒントは問題ごとに持つ（c.hints[i]）。章でまとめて持つと、詰まっている問題と関係のないヒントから順に開くことになる
+function hintsHTML(c,i){
+  const hs=c.hints[i]||[],hn=Math.min(S.hints[c.id+'-'+i]||0,hs.length);
+  return `<div class="hints">${hs.slice(0,hn).map((h,k)=>`<div class="hint">ヒント${k+1}：${h}</div>`).join('')}
+   ${hn<hs.length?`<button class="btn ghost sm" type="button" data-hint="${i}">ヒントを見る（${hn+1}/${hs.length}）</button>`:''}</div>`;
+}
+// ヒントを開くときはヒントの欄だけを書き換える（ノート全体を作り直すと、入力途中の答えが消える）
+function bindHints(el,c){
+  el.querySelectorAll('[data-hint]').forEach(b=>b.onclick=()=>{
+    const i=+b.dataset.hint,k=c.id+'-'+i;
+    S.hints[k]=(S.hints[k]||0)+1;save();
+    b.closest('.hints').outerHTML=hintsHTML(c,i);bindHints(el,c);
+  });
 }
 function noteHTML(){
   const c=CH[S.cur],first=c.steps.findIndex((_,i)=>!stepDone(c,i));
-  const shown=first===-1?c.steps.length:first+1,hn=S.hints[c.id]||0,done=chDone(c);
-  const hints=done?'':`<div class="hints">${c.hints.slice(0,hn).map((h,i)=>`<div class="hint">ヒント${i+1}：${h}</div>`).join('')}
-   ${hn<c.hints.length?`<button class="btn ghost sm" type="button" id="hbtn" style="align-self:flex-start">ヒントを見る（${hn+1}/${c.hints.length}）</button>`:''}</div>`;
+  const shown=first===-1?c.steps.length:first+1,done=chDone(c);
   const last=S.cur===CH.length-1,label=c.next||(last?'事件ファイルを閉じる':'次の章へ');
   const sol=done?`<div class="solved"><div class="num" style="color:var(--ok);font-family:var(--f-mono);font-size:11px;letter-spacing:.12em">解明</div>${c.solved}<button class="btn" id="nx" type="button">${label}</button></div>`:'';
   const memos=[];CH.forEach(x=>x.steps.forEach((st,i)=>{if(stepDone(x,i))memos.push(`<li><span class="mono" style="color:var(--muted)">${stepLabel(x,st,i)}</span> ${st.memo}</li>`)}));
   return `<div class="nt-head"><b>${c.no}　${c.title}</b><span>${c.clock} ・ ${c.where}</span></div>
-   <h3>いまの疑問</h3><div class="steps">${c.steps.slice(0,shown).map((st,i)=>stepHTML(c,st,i)).join('')}${hints}${sol}</div>
+   <h3>いまの疑問</h3><div class="steps">${c.steps.slice(0,shown).map((st,i)=>stepHTML(c,st,i)).join('')}${sol}</div>
    <h3>わかったこと</h3>${memos.length?`<ol class="memo-list">${memos.join('')}</ol>`:'<div class="cap">小問を解くと、わかったことがここにたまっていく。</div>'}`;
 }
 function initNote(el){
   const c=CH[S.cur];
   el.querySelectorAll('form[data-s]').forEach(f=>f.onsubmit=e=>{e.preventDefault();answer(c,+f.dataset.s,f)});
-  const hb=el.querySelector('#hbtn'); if(hb)hb.onclick=()=>{S.hints[c.id]=(S.hints[c.id]||0)+1;save();refreshNote()};
+  bindHints(el,c);
   const nx=el.querySelector('#nx'); if(nx)nx.onclick=()=>S.cur===CH.length-1?showEnding():enterChapter(S.cur+1);
 }
 function refreshNote(){const w=WIN.note;if(!w)return;const bd=w.querySelector(".bd");bd.innerHTML=noteHTML();initNote(w);(bd.querySelector(".task")||bd.querySelector(".solved"))?.scrollIntoView?.({block:"nearest"})}
 function answer(c,i,f){
   const st=c.steps[i],fb=$('fb-'+i);
   const bad=m=>{fb.className='feedback bad';fb.textContent=m};
+  // 誤答の数はエンディングの記録に出す（未入力は数えない）
+  // 対決は3回まちがえると相手が立て直し、最初の言い分からやり直しになる（山場に緊張感を持たせる）
+  const duel=/^(対決|最後)/.test(st.tag||''),D=(S.duel??={});
+  const wrong=m=>{
+    S.miss=(S.miss||0)+1;
+    if(duel&&(D[c.id]=(D[c.id]||0)+1)>=3){
+      D[c.id]=0;c.steps.forEach((s,j)=>{if(s.tag)delete S.done[c.id+'-'+j]});save();refreshNote();renderMenu();
+      return narrate([[c.foe,c.retreat],['','引き止めた。まだ終わっていない。もう一度、最初の言い分から崩していく。']]);
+    }
+    save();bad(duel?`${m}（あと${3-D[c.id]}回まちがえると、相手は態勢を立て直す）`:m);
+  };
   let shown='';
   if(st.type==='text'){
     const raw=f.querySelector('input').value,v=norm(raw);
     if(!v)return bad('答えを入力してください。');
-    if(!st.check(v)){const t=(st.traps||[]).find(t=>t[0].test(v));return bad(t?t[1]:'証拠と合わない。資料をもう一度見直そう。')}
+    if(!st.check(v)){const t=(st.traps||[]).find(t=>t[0].test(v));return wrong(t?t[1]:'証拠と合わない。資料をもう一度見直そう。')}
     shown=raw.trim();
   }else if(st.type==='choice'){
     const v=f.querySelector('input:checked')?.value??'';
     if(v==='')return bad('選択肢から選んでください。');
-    if(+v!==st.answer)return bad(st.why(+v));
+    if(+v!==st.answer)return wrong(st.why(+v));
     shown=st.options[st.answer];
   }else{
     const sel=[...f.querySelectorAll('input:checked')].map(x=>+x.value);
     if(!sel.length)return bad('当てはまるものを選んでください。');
-    if(!(sel.length===st.answer.length&&st.answer.every(a=>sel.includes(a))))return bad(st.why(sel));
+    if(!(sel.length===st.answer.length&&st.answer.every(a=>sel.includes(a))))return wrong(st.why(sel));
     shown=st.answer.map(a=>st.options[a]).join(' ／ ');
   }
   S.done[c.id+'-'+i]=shown;save();refreshNote();renderMenu();
@@ -1779,13 +2112,19 @@ function showTitle(){
   $('title').hidden=false;
   $('title').querySelector('.bgv').innerHTML=roomSVG({noflick:true});
   [[1,'start'],[2,'start2']].forEach(([n,id])=>{
-    const b=$(id),started=Object.keys(loadSave(n).done).length>0;
-    b.innerHTML=`第${n===1?'一':'二'}話　${EPS[n].title}<small>${started?'つづきから':'はじめる'}</small>`;
+    const b=$(id),done=loadSave(n).done,started=Object.keys(done).length>0;
+    const cleared=EPS[n].ch.every(c=>c.steps.every((_,i)=>done[c.id+'-'+i]));
+    b.innerHTML=`第${n===1?'一':'二'}話　${EPS[n].title}<small>${cleared?'解決済み ・ 読み返す':started?'つづきから':'はじめる'}</small>`;
     b.onclick=()=>{setEp(n);$('title').hidden=true;enterChapter(S.cur)};
   });
 }
 
 // ===== エンディング =====
+// この話の記録。ヒントの数は問題ごとのキー（章-問）だけを数える（章ごとに数えていた古い保存データのキーは除く）
+function recordHTML(){
+  const h=Object.entries(S.hints).reduce((n,[k,v])=>n+(k.includes('-')?v:0),0),m=S.miss||0;
+  return `<p class="cap">この話の記録：誤答 ${m} 回 ・ 開いたヒント ${h} 個${m+h?'':'　― 一度も迷わずに解いた'}</p>`;
+}
 function ending1(){
   return `<div class="ending">
    <div class="eyebrow">解決</div>
@@ -1815,6 +2154,7 @@ function ending1(){
    </div>
    <div class="teaser"><div class="eyebrow" style="color:#8fa4c9">次の事件</div><div class="t">第二話「不在証明」</div>
     <p>すべてのログが、透さんが犯人だと言っている。ならば、嘘をついているのは誰か。</p></div>
+   ${recordHTML()}
    <div class="endbtns"><button type="button" class="back go2" id="toEp2">第二話「不在証明」へ</button><button type="button" class="back" id="endBack">デスクトップに戻る</button></div></div>`;
 }
 function showEnding(){
