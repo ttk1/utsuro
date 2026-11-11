@@ -17,7 +17,8 @@ const ev=ch;
 // 証拠をつかむ: ノートの枠の×で全部外してから、アプリの中の要素を押してつかみ、結びつける
 const grab=id=>{const el=d.querySelector(`#wins [data-ev="${id}"]`);if(!el)throw new Error('つかめる要素がない: '+id);click(el)};
 const ungrab=()=>{let b;while((b=note().querySelector('[data-un]')))click(b)};
-const pk=(i,ids)=>{ungrab();ids.forEach(grab);return submitStep(i,()=>{})};
+// 問題は語りを読み終えるまでノートに出ず、つかむこともできないので、先に読む
+const pk=(i,ids)=>{readAll();ungrab();ids.forEach(grab);return submitStep(i,()=>{})};
 const next=()=>{readAll();d.getElementById('nx').click()};
 const open=id=>d.querySelector(`#icons [data-app="${id}"]`).click();
 const S=()=>w.eval('S');
@@ -29,11 +30,22 @@ const NRtext=()=>{d.getElementById('narr').click();return d.querySelector('#narr
 d.getElementById('tsound').click();
 check('sound on',/あり/.test(d.getElementById('tsound').textContent)&&/"sound":true/.test(w.localStorage.getItem('utsuro-pref-v1')));
 d.getElementById('start').click();
+// つかみ: 第一話を初めて始めるときだけ、序章の前に配信が映る。押すと飛ばせて、二度目からは出ない
+const cold=d.getElementById('cold');
+check('cold open',!cold.hidden&&!!cold.querySelector('.stream svg')&&/招かれます/.test(cold.textContent)&&d.querySelectorAll('.win').length===0);
+click(cold);
+check('cold open skip',cold.hidden&&!cold.innerHTML&&/"cold":true/.test(w.localStorage.getItem('utsuro-pref-v1'))&&!!note());
+d.getElementById('menuBtn').click();d.getElementById('mtitle').click();d.getElementById('start').click();
+check('cold open once',cold.hidden&&d.getElementById('title').hidden&&/配信/.test(d.getElementById('cast').textContent));
+// 章の語りを読み終えるまで、最初の疑問はノートに出ない
+check('question waits',!!note().querySelector('.task.wait')&&!note().querySelector('form[data-s]'));
 console.log('narr:',d.querySelector('#narr .who').textContent,'| windows:',[...d.querySelectorAll('.win')].map(x=>x.dataset.win).join(','));
 console.log(txt(0,'toru'));txt(0,'ghostwire');
 // 章を解き終えると、語りの最後の行にも次へ進むボタンが出る
 readAll();check('next in narration',!!d.querySelector('#narr [data-nn]'));d.querySelector('#narr [data-nn]').click();
-console.log('chat badge:',!!d.querySelector('#icons [data-app=chat] .badge'));open('chat');console.log('chat badge after open:',!!d.querySelector('#icons [data-app=chat] .badge'));
+// チャットの通知と未読の印は、語りが「スマホが震えた」に届いてから。語りを読むまでは、証拠もつかめない
+const due0=w.eval('chatDue(CH[S.cur])'),pick0=d.getElementById('wins').classList.contains('picking');readAll();
+check('chat after narration',!due0&&!pick0&&w.eval('chatDue(CH[S.cur])'));open('chat');check('chat seen',!w.eval('chatDue(CH[S.cur])'));
 
 // 第一章: 証拠をつかんで結びつける。ヒントを開いても、つかんだ証拠は消えない
 ['blog','admin','draft','loc'].forEach(open);
@@ -50,11 +62,16 @@ check('pick fifo',w.eval('PK.sel.join()')==='b2,b0,a5');
 // 枠がそろうと、下の帯のボタンが「結びつける」になり、そのまま判定できる
 check('tray button',!!d.querySelector('#pickbar [data-go]')&&!d.querySelector('#pickbar [data-tonote]'));
 click(d.querySelector('#pickbar [data-go]'));check('tray submit',S().done['1-0']!==undefined);
+// 書き方の違いに気づいたあと、透の一言（lead）を読み終えるまで、次の疑問は出ない
+check('lead after first find',!!note().querySelector('.task.wait')&&/二つの文章/.test(NRtext()));readAll();
 console.log('next step hints:',note().querySelectorAll('.hint').length,'/',hintBtn().textContent);
 console.log(pk(1,['a5','l0']));console.log(pk(1,['a5','l4']));pk(1,['a5','l5']);
 check('pick done',!d.getElementById('wins').classList.contains('picking')&&d.getElementById('pickbar').hidden);next();
 
 // 配信の録画: 左右反転で透が一言反応し、語りに差しこまれる。再生は始めて止められる（音は jsdom では鳴らない）
+// 配信のウィンドウは、語りが「ふっと明るくなった」に届くまで黒い画面のまま
+const pre0=d.getElementById('live').classList.contains('pre');readAll();
+check('live lights up',pre0&&!d.getElementById('live').classList.contains('pre'));
 d.getElementById('lvflip').click();d.getElementById('lvplay').click();d.getElementById('lvplay').click();
 check('live',d.querySelector('#live svg').style.transform==='scaleX(-1)'&&/左右が逆/.test(d.querySelector('#narr .txt').textContent+NRtext()));
 open('map');console.log('map pins',d.querySelectorAll('.pin').length);

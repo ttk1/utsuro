@@ -126,6 +126,12 @@ button:focus-visible,input:focus-visible,select:focus-visible,[tabindex]:focus-v
 .over[hidden]{display:none}
 #title .bgv{position:absolute;inset:0;opacity:.22;filter:blur(1px) saturate(.6)}
 #title .bgv svg{width:100%;height:100%;object-fit:cover}
+/* 縦長の画面では、部屋を高さに合わせて広げ、時計と窓のあたりを見せる（幅に合わせると、ボタンの裏の細い帯にしか映らない） */
+@media (max-aspect-ratio:1/1){#title .bgv svg{position:absolute;top:0;left:50%;height:100%;width:auto;aspect-ratio:16/9;transform:translateX(-56%)}}
+/* 配信中（遊んでいる人の時計で 03:33〜03:44）は、部屋がはっきり映る */
+#title.onair .bgv{opacity:.5}
+#title .cast{font-family:var(--f-mono);font-size:12.5px;letter-spacing:.08em;color:#8e919b;min-height:1.7em}
+#title .cast .live{color:#ff5e5e}
 #title .in{position:relative;display:flex;flex-direction:column;align-items:center;gap:14px}
 #title h1{font-family:var(--f-display);font-weight:800;font-size:clamp(44px,9vw,96px);letter-spacing:.14em;margin:0;line-height:1.1}
 #title h1 span{color:#e5a13f}
@@ -141,7 +147,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,[tabindex]:focus-v
 #title .snd{background:transparent;border:1px solid #3b3e47;border-radius:3px;color:#a9abb3;font-size:12px;padding:6px 16px;cursor:pointer;font-family:var(--f-ui)}
 #title .snd[aria-pressed=true]{border-color:#e5a13f;color:#e5a13f}
 #title .note{position:absolute;bottom:18px;left:0;right:0;padding:0 16px;font-size:11.5px;color:#6f727c;font-family:var(--f-ui)}
-#title::after,#card::after{content:"";position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(255,255,255,.03) 0 1px,transparent 1px 3px)}
+#title::after,#card::after,#cold::after{content:"";position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(255,255,255,.03) 0 1px,transparent 1px 3px)}
 #card{cursor:pointer;transition:opacity .6s}
 /* 消えていく 0.6 秒のあいだもタップを受け止める（章扉を飛ばそうと押した指が、下のノートの「ヒントを見る」に当たるため） */
 #card.out{opacity:0;visibility:hidden;transition:opacity .6s,visibility 0s .6s}
@@ -149,6 +155,19 @@ button:focus-visible,input:focus-visible,select:focus-visible,[tabindex]:focus-v
 #card .no{font-family:var(--f-mono);font-size:12px;letter-spacing:.3em;color:#e5a13f}
 #card h2{font-family:var(--f-display);font-size:clamp(30px,5vw,48px);margin:0;letter-spacing:.12em}
 #card .wh{font-family:var(--f-mono);font-size:13px;color:#9a9ca5}
+/* つかみ: 第一話を初めて始めるとき、序章の前に配信を十数秒だけ見せる。黒い画面のトップページ → 部屋 → 黒 */
+#cold{cursor:pointer;gap:10px}
+#cold .cbox,#cold .cfoot{width:min(100%,1280px,(100vh - 150px)*16/9)}
+#cold .cbox{position:relative;aspect-ratio:16/9;background:#000}
+#cold .site,#cold .stream{position:absolute;inset:0}
+#cold .site{display:grid;place-items:center;background:transparent}
+#cold .site .t{font-size:clamp(24px,4vw,38px)}
+#cold .stream{opacity:0;transition:opacity 1.6s ease-out}
+#cold .ov{font-size:clamp(10px,1.9vw,18px)}
+#cold .cbox.on .stream{opacity:1}
+#cold .cbox.on .site,#cold .cbox.off>*{display:none}
+#cold .cfoot{display:flex;justify-content:space-between;align-items:baseline;font-family:var(--f-ui);font-size:11.5px;color:#55585f}
+#cold .cfoot b{font-family:var(--f-mono);font-weight:400;font-size:14px;color:#8e919b}
 #endov{justify-content:flex-start;overflow:auto;background:#07080b}
 .ending{max-width:720px;width:100%;margin:6vh auto;padding:0 8px 48px;display:flex;flex-direction:column;gap:14px;text-align:left;font-family:var(--f-display);font-size:16px;line-height:1.95}
 .ending h2{font-size:34px;margin:0;letter-spacing:.1em}
@@ -199,6 +218,13 @@ tr.pick:hover td{background:var(--surface2)}
 .ov .tl{position:absolute;top:8px;left:10px}
 .ov .tr{position:absolute;top:8px;right:10px;text-align:right}
 .ov .live{color:#ff5e5e}
+/* 第一話 第二章の配信: 語りが「黒い画面がふっと明るくなった」に届くまでは、配信前の黒い画面（pre）。終わると何も残さず黒に戻る（ended） */
+#live{position:relative}
+#live .site{position:absolute;inset:0;display:none;place-items:center;text-align:center}
+#live .stream svg{transition:opacity 1.4s ease-out}
+#live.pre .site{display:grid}
+#live.pre .stream svg{opacity:0}
+#live.pre .ov,#live.ended .ov,#live.pre~.seg,#live.pre~.cap{visibility:hidden}
 .diffbox{position:relative;background:#000;max-width:100%}
 .diffbox svg{display:block;width:100%;height:auto}
 .diffbox .top{position:absolute;inset:0}
@@ -389,11 +415,18 @@ button.slot{font:inherit;font-size:13px;cursor:pointer}
 @media (prefers-reduced-motion:no-preference){
   .flick{animation:flick 6s infinite}
   /* 貨物が通るあいだ、配信の画面をかすかに揺らす */
-  #live.rumble .stream{animation:shake .22s linear infinite}
+  #live.rumble .stream,#cold .rumble .stream{animation:shake .22s linear infinite}
+  /* 配信を見ている画面には、安いカメラの映像らしい薄い帯をゆっくり流す（手がかりを読む解析の画面には流さない） */
+  #live .ov::after,#cold .ov::after{content:"";position:absolute;left:0;right:0;top:0;height:20%;background:linear-gradient(transparent,rgba(255,255,255,.04),transparent);animation:roll 7s linear infinite}
+  @keyframes roll{from{transform:translateY(-100%)}to{transform:translateY(500%)}}
+  /* タイトルの背景の部屋は、電波が届いたり遠のいたりするように、ゆっくり明るさを変える */
+  #title:not(.onair) .bgv{animation:sig 11s infinite}
+  @keyframes sig{0%,100%{opacity:.2}40%{opacity:.3}42%{opacity:.14}44%{opacity:.3}60%{opacity:.26}85%{opacity:.15}}
+  #cold .site{animation:tin 1.6s ease-out}
   @keyframes shake{25%{transform:translate(.7px,.4px)}75%{transform:translate(-.6px,-.4px)}}
   @keyframes flick{0%,96%,100%{opacity:1}97%{opacity:.75}98%{opacity:1}99%{opacity:.85}}
 }
-@media (prefers-reduced-motion:reduce){.done-step.duel.just s.brkq,.done-step.duel.just b,.whisper,#narr .more,.toast,.bubble.typing i,.done-step.just,.done-step.duel.just,.solved,.term .stg,#fuse.hit .fusebar i{animation:none}.zoomable .stream svg{transition:none}}
+@media (prefers-reduced-motion:reduce){.done-step.duel.just s.brkq,.done-step.duel.just b,.whisper,#narr .more,.toast,.bubble.typing i,.done-step.just,.done-step.duel.just,.solved,.term .stg,#fuse.hit .fusebar i{animation:none}.zoomable .stream svg,#live .stream svg,#cold .stream{transition:none}}
 /* 狭い画面: アイコン・ウィンドウ・語りを縦に並べ、ウィンドウは一枚ずつ残りの高さいっぱいに開く。
    語りの高さは文の長さで変わるので、決め打ちせず縦並びにして重ならないようにしている */
 @media (max-width:760px){
@@ -407,8 +440,11 @@ button.slot{font:inherit;font-size:13px;cursor:pointer}
   .win{left:0!important;top:0!important;width:100%!important;height:100%!important;min-height:0;border-radius:0;border-width:1px 0 0}
   .win .rz{display:none}
   .win .tb{cursor:default}
-  /* アイコンの列やウィンドウの×ボタンをふさがないよう、タイトルバーの下に出す */
-  .toast{top:132px;bottom:auto}
+  /* つかみの映像は画面の幅いっぱいに出す */
+  #cold{padding-left:0;padding-right:0}
+  #cold .cfoot{padding:0 12px}
+  /* 通知は語りのすぐ上に出す（位置は toastPos が決める）。上に出すと、ウィンドウの×ボタンやノートの章題に重なる */
+  .toast{right:8px;bottom:8px}
   #narr{position:relative;left:auto;bottom:auto;transform:none;flex:none;width:auto;margin:0 8px 8px;padding:10px 12px 8px}
   #narr .txt{font-size:15px;min-height:3.4em}
   /* 下の行は折り返さない（一言が届いて行数の表示が変わっても、語りの高さを変えないため） */
@@ -482,6 +518,7 @@ button.slot{font:inherit;font-size:13px;cursor:pointer}
   <div class="in">
     <h1>無人<span>放送</span></h1>
     <p><span class="nb">毎夜三時三十三分。</span><span class="nb">誰もいない部屋が、</span><span class="nb">十一分だけ映る。</span></p>
+    <div class="cast" id="cast"></div>
     <div class="eps"><button type="button" class="go" id="start"></button><button type="button" class="go" id="start2"></button></div>
     <div class="tip">第二話は第一話の続きです。第一話から遊んでください。</div>
     <button type="button" class="snd" id="tsound"></button>
@@ -489,6 +526,7 @@ button.slot{font:inherit;font-size:13px;cursor:pointer}
   <div class="note"><span class="nb">進行状況はこのブラウザに保存されます。</span><span class="nb">登場する人物・地名・サイトはすべて架空です。</span></div>
 </div>
 <div id="card" class="over out" aria-hidden="true"></div>
+<div id="cold" class="over" hidden></div>
 <div id="endov" class="over" hidden></div>
 
 <script>
@@ -727,6 +765,8 @@ function roomFigures(id,P){
    <g fill="rgb(12,12,13)" filter="url(#${id}b)">${ryo.hands}</g>`;
 }
 function stream(svg,tl,tr){return `<div class="stream">${svg}<div class="ov"><div class="tl"><span class="live">●</span> ${tl}</div><div class="tr">${tr}</div></div></div>`}
+// utsuro.tv のトップページの文句（サイトのアプリ、配信が始まる前の黒い画面、つかみで使う）
+const SITE_TOP=`<div class="t">うつろ放送</div><p>毎夜、三時三十三分。うつろの部屋をお見せします。</p><p>部屋に誰かが映ったら、その方は招かれます。</p>`;
 
 // ===== 地図 =====
 const PLACES=[
@@ -862,6 +902,8 @@ function initZoom(box){
 // 11分を20倍速で流す。03:38 と 03:41 に貨物の通過音が入り、03:44 に唐突に終わる。
 // 音は Web Audio で合成する（外部の音声ファイルは読まない）。50Hz のハム音と、低いノイズで作る通過音
 const RUMBLE=[[300,340],[480,525]]; // 03:33:00 からの秒
+const stamp=s=>`03:${33+Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
+const LIVE_AT=2; // 第二章の語りで、配信が始まる行（「黒い画面がふっと明るくなった」）
 let AC=null;
 function liveSound(){
   try{
@@ -922,7 +964,8 @@ function initLive(el){
   // 配信の音は、効果音を「あり」にしていれば初めから ON にする（ここのボタンで、この録画だけ切り替えられる）
   const cap0=cap.textContent,play0=play.textContent;let t=0,timer=null,sound=null,wantSound=!!PREF.sound;
   snd.textContent=wantSound?'音 ON':'音 OFF';snd.classList.toggle('on',wantSound);
-  const stamp=s=>`03:${33+Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
+  // 章の語りが配信の始まる行（LIVE_AT）に届くまでは、配信前の黒い画面にしておく。届くと語りの側が pre を外し、部屋がふっと映る
+  const c=CH[S.cur];if(!chDone(c)&&(S.nr[c.id]||0)<LIVE_AT)box.classList.add('pre');
   const stop=label=>{clearInterval(timer);timer=null;sound?.stop();sound=null;box.classList.remove('rumble');play.textContent=label};
   const tick=()=>{
     if(!el.isConnected)return stop(play0);
@@ -930,11 +973,13 @@ function initLive(el){
     tr.innerHTML=`${stamp(Math.min(t,659))}<br>視聴 12`;
     box.classList.toggle('rumble',r);sound?.rumble(r);
     cap.textContent=end?'03:44。画面は唐突に黒に戻った。':r?`${stamp(t).slice(0,5)}　（遠くで、重いものが転がるような低い音）`:'（かすかな低い唸りのほかは、何も聞こえない）';
-    if(end){svg.style.visibility='hidden';stop('▶ もう一度再生');react('live',['透','十一分間、何も起きなかった。動いたのは、音だけだ。三時三十八分と、四十一分。'])}
+    if(end){svg.style.visibility='hidden';box.classList.add('ended');stop('▶ もう一度再生');react('live',['透','十一分間、何も起きなかった。動いたのは、音だけだ。三時三十八分と、四十一分。'])}
   };
   play.onclick=()=>{
-    svg.style.visibility='';
+    svg.style.visibility='';box.classList.remove('ended');
     if(timer){stop(play0);tr.innerHTML='03:35:12<br>視聴 12';cap.textContent=cap0;return}
+    // 再生のたびに、黒い画面から明るくなるところから始める（CSS の transition で戻る）
+    svg.style.transition='none';svg.style.opacity='0';void svg.getBoundingClientRect();svg.style.transition='';svg.style.opacity='';
     t=0;play.textContent='■ 止める';if(wantSound)sound=liveSound();timer=setInterval(tick,100);
   };
   snd.onclick=()=>{wantSound=!wantSound;snd.textContent=wantSound?'音 ON':'音 OFF';snd.classList.toggle('on',wantSound);
@@ -1209,12 +1254,13 @@ const CH1=[
 {
  id:0,no:'序章',title:'十年後の依頼',theme:'y2036',mark:'SHINOMIYA RESEARCH',next:'2026_utsuro を開く',clock:'2036/10/20 23:10',where:'篠宮リサーチ 事務所',
  narr:[[M,'2036年10月。篠宮透が逮捕されて、三日が経った。'],
-  [M,'容疑は殺人。被害者はフリーの記者で、透さんの古い知り合いだった。犯行時刻、透さんのスマホは現場にあった。現場の防犯カメラには、透さんによく似た男が映っていた。透さんのアカウントからは、「全部俺がやった」という投稿まで出ている。'],
+  [M,'容疑は殺人。被害者はフリーの記者で、透さんの古い知り合いだった。'],
+  [M,'犯行時刻、透さんのスマホは現場にあった。防犯カメラには、透さんによく似た男が映っていた。透さんのアカウントからは、「全部俺がやった」という投稿まで出ている。'],
   [M,'透さんは取り調べで、ひとことも話していないらしい。'],
-  [M,'私は春日ミオ。透さんの事務所で働いて四年になる。'],
-  [M,'四年前、私は透さんに見つけられた側の人間だった。ログの消し方なら、その前から知っていた。残し方と読み方を教えてくれたのは、透さんだ。'],
-  [M,'逮捕の前の晩、透さんからメッセージが届いていた。'],
-  [M,'「ログは嘘をつかない。嘘をつくのは、ログを読む人間だ」。透さんの口癖だ。今回のログは、全部透さんが犯人だと言っている。']],
+  [M,'私は春日ミオ。透さんの事務所で働いて四年になる。四年前、私は透さんに見つけられた側の人間だった。ログの消し方なら、その前から知っていた。残し方と読み方を教えてくれたのは、透さんだ。'],
+  [M,'「ログは嘘をつかない。嘘をつくのは、ログを読む人間だ」。透さんの口癖だ。今回のログは、全部透さんが犯人だと言っている。'],
+  // 最後の行をメッセージに向ける（読み終えた人の最初の一手が「メッセージを開く」になる）
+  [M,'逮捕の前の晩、透さんからメッセージが二通だけ届いていた。']],
  chat:{with:'篠宮 透',quiet:true,msgs:[['篠宮 透','2036/10/16 23:48','ミオ．しばらく事務所に戻れない．<br>最初の事件のファイルを読め．全部そこにある．<br>鍵は，俺が最初に名乗った名前．'],['篠宮 透','23:49','架純には連絡するな．'],['me','23:51','どういうことですか？ 透さん？']],tail:'既読はついていない。'},
  open:[],
  steps:[
@@ -1225,8 +1271,8 @@ const CH1=[
  ],
  hints:[['透さんのメッセージには「最初に名乗った名前」とある。','「資料」に、透さんが学生時代に使っていたプロフィールがある。']],
  solved:`<p>ファイルが開いた。中身は、透さんが大学三年のときに使っていたノートPCのディスクイメージ。捜査メモと、集めたログのすべて。</p>
- <p>透さんはよく、この事件のことを話してくれた。酔ったときだけ、少しずつ。これが、透さんが「こっち側」に来た最初の事件だった。</p>
- <p>ここからは、透さんから聞いた話と、このファイルをもとに書く。</p>`,
+ <p>透さんはよく、この事件のことを話してくれた。酔ったときだけ、少しずつ。毎晩三時三十三分に、誰もいない部屋が十一分だけ映る配信の話。そこに映った人は「招かれる」という噂の話。</p>
+ <p>これが、透さんが「こっち側」に来た最初の事件だった。ここからは、透さんから聞いた話と、このファイルをもとに書く。</p>`,
  apps:[
   {id:'news',name:'ニュース',icon:'news',title:'東都ニュース',w:480,h:360,flush:true,html:browser('news.touto.example/2036/10/17',`<div class="news"><div class="src">東都ニュース ・ 2036/10/17</div><h4>記者殺害の疑い、調査会社代表の男を逮捕</h4>
     警視庁は17日、記者の男性を殺害した疑いで、情報調査会社「篠宮リサーチ」代表、篠宮透容疑者（30）を逮捕した。位置情報や防犯カメラの映像などから関与が浮上したという。捜査はサイバー犯罪対策課の水野警部補らが担当している。篠宮容疑者は黙秘している。</div>
@@ -1252,13 +1298,13 @@ $ open 2026_utsuro.enc
  id:1,no:'第一章',title:'別れの投稿',theme:'y2026',mark:'ghostwire',boot:'$ mount 2026_utsuro.img /mnt/case\n  ghostwire-x13 / 2026-10-19 snapshot ... ok\n',clock:'2026/10/19 01:12',where:'情報工学棟 7階 研究室',
  narr:[[M,'「ログは嘘をつかない」。透さんが最初にそれを知ったのは、二十歳のとき、後輩から届いたメッセージがきっかけだったという。','frame'],
   ['','2026年10月19日、月曜日。午前一時を過ぎた情報工学棟の七階には、篠宮透のほかに誰もいなかった。'],
-  ['','スマホが震えた。ゼミの一つ下の後輩、水野架純からだった。'],
-  ['透','本人が書いた文章かどうかは、言葉より先にログが教えてくれる。いつ、どこから、何で書かれたか。']],
- chat:{with:'水野 架純',msgs:[['水野 架純','01:04','先輩、急にすみません。兄と9日間連絡が取れないんです。'],['水野 架純','01:04','警察には行きました。でもブログに「探さないでくれ」って書いてあるから、家出だろうって。'],['水野 架純','01:05','兄はあんな文章書かないです。兄のブログの管理画面と、家族で使ってる位置共有は見られます。'],['me','01:07','ログ，全部ちょうだい．消える前に．']]},
+  ['','スマホが震えた。ゼミの一つ下の後輩、水野架純からだった。']],
+ // at: 通知と未読の印は、語りがこの行（「スマホが震えた」）に届いてから出す
+ chat:{with:'水野 架純',at:2,msgs:[['水野 架純','01:04','先輩、急にすみません。兄と9日間連絡が取れないんです。'],['水野 架純','01:04','警察には行きました。でもブログに「探さないでくれ」って書いてあるから、家出だろうって。'],['水野 架純','01:05','兄はあんな文章書かないです。兄のブログの管理画面と、家族で使ってる位置共有は見られます。'],['me','01:07','ログ，全部ちょうだい．消える前に．']]},
  open:[],
  steps:[
   // 証拠をつかむ問題。b=ブログの記事、a=管理画面の行、d=下書き、l=位置共有の行、m=メッセージ
-  {type:'pick',n:3,ev:'style',q:'架純は「兄はあんな文章書かない」と言う。「お別れ」は、本当に遼が書いたのか。<br>「お別れ」の記事を、いつもの遼と見比べろ。記事と、引っかかる所がわかるものを二つ（書き方と、公開されるまでの手順）、結びつけろ。',
+  {type:'pick',n:3,ev:'style',q:'架純は「兄はあんな文章書かない」と言う。「お別れ」は、本当に遼が書いたのか。<br>「お別れ」の記事と、いつもの遼と食い違う所がわかるものを二つ、結びつけろ。',
    how:'「遼のブログ」「管理画面」「下書き」を開き、点線で囲まれた記事や表の行を押すとつかめる。もう一度押すと外れる。',
    check:sel=>{
     const has=id=>sel.includes(id),style=['b0','b1','d0'].some(has);
@@ -1271,7 +1317,9 @@ $ open 2026_utsuro.enc
     return '遼はいつも夜遅くに、下書きを保存してから公開している。その行は、いつもどおりのものだ。「お別れ」と食い違うものを探そう。';},
    shown:'「お別れ」には「！？」がなく、一人称は「俺」。下書き保存もなしに公開されている',
    memo:'「お別れ」は文体（「！？」がない・一人称「俺」）と手順（下書きなし）が遼の習慣と違う。普通の文章だが、遼の文章ではない。'},
-  {type:'pick',n:2,ev:'loc',q:'「お別れ」が公開された瞬間、遼のスマホはどこにあった？<br>公開の記録と、その時刻の位置の記録を結びつけろ。',
+  // 解く前の語りで方法を説明せず、書き方の違いに自分で気づいたあとに、透がログへ目を向ける（小説の第一章の言葉）
+  {type:'pick',n:2,ev:'loc',lead:[['透','同じ夜に、同じスマホから書かれた二つの文章。片方は本人の癖そのままで、片方は全然違う。'],['透','ただ、文体だけなら、本人がわざと変えたのかもしれない。だから、ログが要る。曖昧な言葉の外側に、時刻と場所が残る。']],
+   q:'「お別れ」が公開された瞬間、遼のスマホはどこにあった？<br>公開の記録と、その時刻の位置の記録を結びつけろ。',
    how:'「管理画面」と「位置共有」の表の行を、一つずつつかむ。',
    check:sel=>{
     const has=id=>sel.includes(id);
@@ -1286,8 +1334,9 @@ $ open 2026_utsuro.enc
  ],
  hints:[['過去の記事の書き方の癖（記号、一人称）と、「お別れ」を比べよう。つかむ一つ目は「お別れ」、二つ目は過去の記事か下書き。','三つ目は「管理画面」の「お別れ」の行。ほかの記事は、下書き保存のあとに公開されている。'],
   ['管理画面の時刻はUTC（協定世界時）。日本時間はUTCに9時間足す。','10/10 18:52 UTC は、日本時間で 10/11 03:52。「位置共有」で、その時刻にいちばん近い行をつかもう。']],
- solved:`<p>「お別れ」は遼の書き方ではない。しかも公開されたのは日本時間の 10/11 03:52、スマホは<b>月見台二丁目</b>にあった。その1時間前、遼自身がスマホで書いた下書きが残っている。「例の建物の前」「管理会社の人が中を見せてくれる」。</p>
- <p>遼のブラウザ履歴には、深夜3時台に同じURLが何度も出てくる。<span class="mono">utsuro.tv</span>。サイト名は「うつろ放送」。</p>`,
+ solved:`<p>遼は十日の夜に一度家に帰り、終電で月見台に向かった。それからずっと、<b>月見台二丁目</b>から動いていない。午前三時五十二分、「お別れ」が公開された。その一時間ほど前には、遼自身がスマホで下書きを書いている。「例の建物の前」「管理会社の人が中を見せてくれる」。四時二十分、スマホの電源が切れた。</p>
+ <p>遼のブラウザ履歴には、深夜3時台に同じURLが何度も出てくる。<span class="mono">utsuro.tv</span>。サイト名は「うつろ放送」。</p>
+ <p>次の配信は、今夜の三時三十三分。透は、自分の目で見ることにした。</p>`,
  apps:[
   {id:'blog',name:'遼のブログ',icon:'web',title:'夜更けの取材帳',w:480,h:640,flush:true,html:browser('yofuke-shuzai.example/ryo',`<div class="cap">遼のブログ「夜更けの取材帳」より、直近の記事</div>
    <div class="doc" data-ev="b0" data-evt="記事 10/03「心霊トンネル…」"><div class="meta">2026/10/03</div><h4>【検証】心霊トンネルのオーブ、全部虫でした！？</h4>結論から言うと、マジで虫です！！ 赤外線ライトに寄ってくる羽虫が、ボケてオーブに見えるだけ。僕はちょっとがっかりしました…！</div>
@@ -1313,7 +1362,8 @@ $ open 2026_utsuro.enc
  id:2,no:'第二章',title:'うつろの部屋',theme:'y2026',mark:'ghostwire',clock:'2026/10/20 03:33',where:'透のアパート',
  narr:[[M,'透さんは今でも、窓のある部屋の写真を見るとまず時計を探す。癖になったのはこの夜からだと、笑っていた。','frame'],
   ['','10月20日、火曜日。午前三時三十二分。透は自分のアパートで、明かりを消してノートパソコンの前に座っていた。'],
-  ['','3時33分。ブックマークを開くと、黒い画面がふっと明るくなった。透は録画を回した。'],
+  // この行（LIVE_AT）で、配信のウィンドウの黒い画面に部屋が映る
+  ['','3時33分。黒い画面が、ふっと明るくなった。透は録画を回した。',,()=>$('live')?.classList.remove('pre')],
   ['','畳の和室。押入れ、壁掛け時計、窓の外には踏切と看板の灯り。誰もいない。視聴者は12人。コメント欄は止まったまま。'],
   ['透','霊は住所を持たない。でも部屋は持っている。窓の外、音、電気。映像には撮った場所が必ず残る。']],
  open:['stream'],
@@ -1339,7 +1389,7 @@ $ open 2026_utsuro.enc
  <p>事故物件サイトによれば、2021年3月14日、コーポ月見台の3階で住人の女性が亡くなっている。部屋番号は伏せられていた。</p>
  <p>気になることがひとつ。東湾貨物線は平日しか走らない。なのに、日曜（10/18）の配信にも3:38の通過音が入っていた。</p>`,
  apps:[
-  {id:'stream',name:'うつろ放送',icon:'rec',title:'うつろ放送 ― LIVE',w:600,h:560,flush:true,init:initLive,html:browser('utsuro.tv/live',`<div id="live">${stream(roomSVG(),'LIVE うつろ放送','03:35:12<br>視聴 12')}</div>
+  {id:'stream',name:'うつろ放送',icon:'rec',title:'うつろ放送 ― LIVE',w:600,h:560,flush:true,init:initLive,html:browser('utsuro.tv/live',`<div id="live">${stream(roomSVG(),'LIVE うつろ放送','03:35:12<br>視聴 12')}<div class="site"><div class="body">${SITE_TOP}</div></div></div>
    <div class="seg" role="group" aria-label="録画の操作"><button type="button" id="lvplay">▶ 録画を再生（20倍速）</button><button type="button" id="lvsnd">音 OFF</button><button type="button" id="lvflip">左右反転</button></div>
    <div class="cap" id="lvcap">10/20（火）の配信を録画したもの。窓の外に踏切と看板、正面の壁に時計。</div>`)},
   {id:'audio',name:'音声解析',icon:'wave',title:'Spectra ― utsuro_1020.wav',w:480,h:430,html:`<b>低周波スペクトル（03:33〜03:44）</b>
@@ -1385,7 +1435,7 @@ $ open 2026_utsuro.enc
  apps:[
   {id:'term',name:'端末',icon:'term',title:'ghostwire@x13: ~',w:700,h:580,flush:true,init:initTerm,html:TERMHTML},
   {id:'site',name:'utsuro.tv',icon:'web',title:'うつろ放送',w:460,h:276,flush:true,html:`<div class="addr">${icon('web')}<span>https://utsuro.tv/</span></div><div class="site"><div class="body">
-    <div class="t">うつろ放送</div><p>毎夜、三時三十三分。うつろの部屋をお見せします。</p><p>部屋に誰かが映ったら、その方は招かれます。</p>
+    ${SITE_TOP}
     <p style="margin-top:14px;font-size:12px;font-family:var(--f-ui)">会員限定アーカイブ（月額 980円）</p></div></div>`}
  ]
 },
@@ -2024,7 +2074,7 @@ const CH2=[
    <div class="cap">このアカウントの最後の投稿。翌朝、透さんは逮捕された。</div>`)},
   {id:'term',name:'端末',icon:'term',title:'mio@old-x2: ~',w:700,h:580,flush:true,init:initTerm,html:TERMHTML},
   {id:'site',name:'utsuro.tv',icon:'web',title:'うつろ放送',w:460,h:276,flush:true,html:`<div class="addr">${icon('web')}<span>https://utsuro.tv/</span></div><div class="site"><div class="body">
-    <div class="t">うつろ放送</div><p>毎夜、三時三十三分。うつろの部屋をお見せします。</p><p>部屋に誰かが映ったら、その方は招かれます。</p></div></div>`}
+    ${SITE_TOP}</div></div>`}
  ]
 },
 {
@@ -2601,7 +2651,8 @@ const evCards=ids=>`<div class="cards">${ids.map(id=>{const [t,b]=evText(id);ret
 // いま解いている問題が pick のあいだ、開いているウィンドウの中の data-ev の付いた要素を押すと、ノートの枠に入る。
 // 枠がいっぱいのときは、いちばん古いものと入れ替える（ハッシュ値の比較と同じ動き）
 let PK={key:null,sel:[],lab:{}};
-function picking(){const s=curStep();return s&&s.st.type==='pick'?s:null}
+// 問題がまだノートに出ていないあいだ（NR.hold。語りを読んでいるところ）は、つかめない
+function picking(){const s=curStep();return s&&s.st.type==='pick'&&!NR.hold?s:null}
 function pickSel(){
   const s=picking();if(!s)return null;
   const k=s.c.id+'-'+s.i;if(PK.key!==k)PK={key:k,sel:[],lab:{}};
@@ -2666,13 +2717,15 @@ function chatApp(c){
     next();
    }};
 }
+// まだ開いていないチャットの通知と未読の印を出してよいか。章の語りが chat.at の行に届いてから（なければ章の頭から）
+const chatDue=c=>!!c.chat&&!c.chat.quiet&&!S.seen['chat'+c.id]&&(chDone(c)||(S.nr[c.id]||0)>=(c.chat.at||0));
 const NOTE={id:'note',name:'捜査ノート',icon:'note',title:'捜査ノート',w:420,h:600,right:true,html:noteHTML,init:initNote};
 // after を持つアプリは、その数の問題を解いたあとに現れる（話の途中で手に入るもの）
 function appsOf(c){return [...(c.chat?[chatApp(c)]:[]),...c.apps.filter(a=>!a.after||stepDone(c,a.after-1)),NOTE]}
 function renderIcons(){
   const c=CH[S.cur];
   // quiet のチャットは前に届いたメッセージを読み返すものなので、未読の印も通知も出さない
-  const unread=a=>a.id==='chat'&&!c.chat.quiet&&!S.seen['chat'+c.id];
+  const unread=a=>a.id==='chat'&&chatDue(c);
   const key=appsOf(c).map(a=>a.id+(unread(a)?'!':'')).join('|')+'@'+EP+'-'+c.id;
   if($('icons').dataset.key===key)return;
   $('icons').dataset.key=key;
@@ -2788,9 +2841,12 @@ function narrate(lines,start=0,key=null,opt={}){NR={...NR,lines,i:Math.min(start
 // 語りをしまったら、語りを待っていたもの（解明の続き、対決の次の言い分）はすぐ出す
 function showNarr(on){
   $('narr').hidden=!on;$('narrBtn').hidden=on;
-  if(on){NR.pend=false;$('narrBtn').classList.remove('new');document.querySelectorAll('.whisper').forEach(t=>t.remove());return}
+  if(on){NR.pend=false;$('narrBtn').classList.remove('new');document.querySelectorAll('.whisper').forEach(t=>t.remove());toastPos();return}
   if(NR.sol!=null){NR.sol=null;drawSolved()}
   if(NR.hold){NR.hold=false;refreshNote()}
+  // 語りの行に付けた仕掛け（配信が映る、通知が届く）も、語りをしまったら待たせない
+  if(NR.key!=null){NR.lines.slice(NR.i+1).forEach(l=>l[3]?.());S.nr[NR.key]=NR.lines.length-1;save();chatNotify()}
+  toastPos();
 }
 function showLine(){
   const box=$('narr'),[who,text,kind]=NR.lines[NR.i],last=NR.i===NR.lines.length-1;
@@ -2811,7 +2867,9 @@ function showLine(){
     // 間（beat）は一度きり。待っているあいだに押されたら、finish が全文を出す
     if(NR.beat){NR.timer=setTimeout(type,NR.beat);NR.beat=0}else type();
   }
-  if(NR.key!==null){S.nr[NR.key]=NR.i;save()}
+  // 読んだ位置は、いちばん先まで読んだ行を残す（戻って読み返しても、届いた通知や映った配信は元に戻さない）
+  if(NR.key!==null){S.nr[NR.key]=Math.max(S.nr[NR.key]||0,NR.i);save();NR.lines[NR.i][3]?.();chatNotify()}
+  toastPos();
   box.querySelector('[data-nb]').onclick=e=>{e.stopPropagation();if(NR.i>0){NR.i--;showLine()}};
   box.querySelector('[data-nf]').onclick=e=>{e.stopPropagation();advance()};
   box.querySelector('[data-nh]').onclick=e=>{e.stopPropagation();showNarr(false)};
@@ -2843,7 +2901,22 @@ function toast(who,text,app){
   // ノートが右下まで開いているとき（縦に長いノート、対決の章の広いノート）は、通知を左下に出す（「突きつける」やヒントに重ねない）
   const nt=WIN.note;
   if(nt&&!nt.hidden&&nt.offsetTop+nt.offsetHeight>$('desk').clientHeight-150&&!media('(max-width:760px)')){t.style.right='auto';t.style.left='110px'}
-  $('desk').appendChild(t);setTimeout(()=>t.remove(),9000);
+  $('desk').appendChild(t);toastPos();setTimeout(()=>t.remove(),9000);
+}
+// 狭い画面では、通知を語り（なければ下の帯、タスクバー）のすぐ上に出す。上に出すと、ノートの章題やウィンドウの×に重なる。
+// 語りの高さは行ごとに変わるので、語りを書き換えるたびに合わせ直す（動くのは通知だけで、押している語りは動かない）
+function toastPos(){
+  const t=document.querySelector('.toast');if(!t||!media('(max-width:760px)'))return;
+  const d=$('desk'),a=[$('pickbar'),$('narr')].find(e=>!e.hidden&&e.offsetHeight);
+  t.style.bottom=(a?d.clientHeight-a.offsetTop:0)+8+'px';
+}
+// チャットの通知。章の語りが chat.at の行に届いたときに一度だけ出し、アイコンに未読の印を付ける。
+// 0.5 秒おくのは、章扉が出ているあいだに鳴らさないためと、iPhone がタップの直後（0.4 秒以内）に現れた要素でクリックを取り消すため
+function chatNotify(){
+  const c=CH[S.cur],k=EP+'-'+c.id;
+  if(!chatDue(c)||NR.told===k)return;
+  NR.told=k;
+  setTimeout(()=>{if(CH[S.cur]!==c||!chatDue(c))return;renderIcons();const m=c.chat.msgs.find(x=>x[0]!=='me');toast(m[0],m[2].replace(/<br>/g,' ').slice(0,40)+'…','chat')},500);
 }
 function enterChapter(i,withCard=true){
   if(!unlocked(i))i=0;
@@ -2856,16 +2929,17 @@ function enterChapter(i,withCard=true){
   $('clock').innerHTML=clockOf(c).replace(' ','<br>');
   renderIcons();
   // 語りを先に出す（ウィンドウを置く場所を決めるときに、語りの位置を避けるため）
+  NR.told=null;
   if(chDone(c))narrate(solvedLines(c));
   else{
-    // 相手の言い分・疑問から始まる章（対決、架純の疑問）は、章の語りを読み終えるかしまうまで、その言葉をノートに出さない
-    // （語りより先に相手の言葉が見えてしまうため。lead のある問題と同じ扱い。読み終えた章に入り直したときは待たせない）
-    const at=Number.isInteger(S.nr[c.id])?S.nr[c.id]:0,s=curStep();
-    narrate(c.narr,at,c.id,{hold:!!s&&(s.st.type==='present'||isDuel(s.st))&&at<c.narr.length-1});
+    // 章の語りを読み終えるかしまうまで、最初の疑問はノートに出さない（物語が一行も進まないうちに入力欄が見えると、
+    // 問題集に見える。相手の言い分から始まる章では、語りより先に相手の言葉が見えてしまう。lead のある問題と同じ扱い）。
+    // 読み終えた章に入り直したときは待たせない
+    const at=Number.isInteger(S.nr[c.id])?S.nr[c.id]:0;
+    narrate(c.narr,at,c.id,{hold:!!curStep()&&at<c.narr.length-1});
   }
   openApp('note');c.open.forEach(openApp);
-  fuseReset();
-  if(c.chat&&!c.chat.quiet&&!S.seen['chat'+c.id]){const m=c.chat.msgs.find(x=>x[0]!=='me');setTimeout(()=>toast(m[0],m[2].replace(/<br>/g,' ').slice(0,40)+'…','chat'),400)}
+  fuseReset();chatNotify();
   renderMenu();
   // 起動の表示（boot）は、前の章から続けて開いたときだけ出す
   if(withCard)showCard(c,from===i-1?c.boot:'');
@@ -2873,7 +2947,9 @@ function enterChapter(i,withCard=true){
 function showCard(c,boot){
   const card=$('card');
   card.innerHTML=`<div class="boot"></div><div class="no">${c.no}</div><h2>${c.title}</h2><div class="wh">${clockOf(c)} ・ ${c.where}</div>`;
-  card.classList.remove('out');card.setAttribute('aria-hidden','false');
+  // 出るときは一瞬で覆う（にじませて出すと、覆いきる前に次の章のデスクトップが透けて見える）。消えるときだけ 0.6 秒かける
+  card.style.transition='none';card.classList.remove('out');void card.offsetWidth;card.style.transition='';
+  card.setAttribute('aria-hidden','false');
   const close=()=>{card.classList.add('out');card.setAttribute('aria-hidden','true')};
   card.onclick=close;
   if(boot&&!reduceMotion)card.querySelector('.boot').textContent=boot;
@@ -2886,10 +2962,68 @@ function showTitle(){
     const b=$(id),done=loadSave(n).done,started=Object.keys(done).length>0;
     const cleared=EPS[n].ch.every(c=>c.steps.every((_,i)=>done[c.id+'-'+i]));
     b.innerHTML=`第${n===1?'一':'二'}話　${EPS[n].title}<small>${cleared?'解決済み ・ 読み返す':started?'つづきから':'はじめる'}</small>`;
-    b.onclick=()=>{sfx('chapter');setEp(n);$('title').hidden=true;enterChapter(S.cur)};
+    b.onclick=()=>{
+      setEp(n);$('title').hidden=true;
+      const go=()=>{sfx('chapter');enterChapter(S.cur)};
+      // 第一話を初めて始めるときだけ、序章の前に配信を見せる
+      if(n===1&&!started&&!PREF.cold)coldOpen(go);else go();
+    };
   });
+  drawCast();
   const sb=$('tsound'),drawSound=()=>{sb.textContent=soundLabel();sb.setAttribute('aria-pressed',String(!!PREF.sound))};
   drawSound();sb.onclick=()=>{toggleSound();drawSound()};
+}
+// タイトルの「次の配信まで」。遊んでいる人の時計で、次の午前 3 時 33 分までを数える。03:33 からの 11 分間は「配信中」になり、背景の部屋がはっきり映る
+function drawCast(){
+  const now=new Date(),t=new Date(now);t.setHours(3,33,0,0);
+  const on=now>=t&&now-t<660000;
+  if(now>=t)t.setDate(t.getDate()+1);
+  const s=Math.floor((t-now)/1000),p=n=>String(n).padStart(2,'0');
+  $('title').classList.toggle('onair',on);
+  $('cast').innerHTML=on?'<span class="live">●</span> 配信中':`次の配信まで　${p(Math.floor(s/3600))}:${p(Math.floor(s/60)%60)}:${p(s%60)}`;
+}
+setInterval(()=>{if(!$('title').hidden)drawCast()},1000);
+
+// ===== つかみ =====
+// 第一話を初めて始めるとき、序章の前に「うつろ放送」を十数秒だけ見せる（題材の絵を、説明より先に見せる）。
+// 黒い画面にトップページの文句 → 時計が 3:33 に変わる → 部屋が映る → 何も起きない → 早回しで 03:44 → 唐突に黒 → 序章。
+// 押すか Enter・Esc で飛ばせる。一度見たら PREF.cold に残し、二度目からは出さない。
+// 動きを減らす設定では、にじませず、早回しもせずに短く見せる。効果音が「あり」なら、映っているあいだだけ配信の音（liveSound）を鳴らす
+function coldOpen(done){
+  const el=$('cold'),ts=[],at=(ms,f)=>ts.push(setTimeout(f,ms));
+  el.innerHTML=`<div class="cbox"><div class="site"><div class="body">${SITE_TOP}</div></div>${stream(roomSVG(),'LIVE うつろ放送','')}</div><div class="cfoot"><span>押すと飛ばせます</span><b>3:32</b></div>`;
+  el.hidden=false;
+  const box=el.querySelector('.cbox'),tr=el.querySelector('.tr'),clk=el.querySelector('.cfoot b');
+  let t=0,view=11,iv=null,snd=null,over=false;
+  const draw=()=>{tr.innerHTML=`${stamp(Math.min(t,659))}<br>視聴 ${view}`;clk.textContent=`3:${33+Math.floor(Math.min(t,660)/60)}`};
+  const finish=()=>{
+    if(over)return;over=true;
+    ts.forEach(clearTimeout);clearInterval(iv);snd?.stop();document.removeEventListener('keydown',key);
+    PREF.cold=true;savePref();el.hidden=true;el.innerHTML='';done();
+  };
+  // 03:44 に、終わりの表示も出さずに黒へ戻る。音もそこで切れる
+  const cut=()=>{clearInterval(iv);snd?.stop();snd=null;box.className='cbox off';at(1500,finish)};
+  const key=e=>{if(['Enter',' ','Escape'].includes(e.key)){e.preventDefault();finish()}};
+  el.onclick=finish;document.addEventListener('keydown',key);
+  if(PREF.sound)audio();
+  const T=reduceMotion?[1500,2200]:[2600,3400]; // 時計が 3:33 に変わる、部屋が映る
+  at(T[0],()=>{clk.textContent='3:33'});
+  at(T[1],()=>{
+    box.classList.add('on');draw();if(PREF.sound)snd=liveSound();
+    iv=setInterval(()=>{t++;draw()},1000);
+  });
+  // 視聴者が一人増える（いま見はじめた一人）
+  at(T[1]+1800,()=>{view=12;draw()});
+  if(reduceMotion)return at(T[1]+3500,cut);
+  // 6 秒は実時間で何も起きない。そのあと残りの十一分を 3 秒で早回しする（貨物の通る二度だけ、画面がかすかに揺れる）
+  at(T[1]+6000,()=>{
+    clearInterval(iv);
+    iv=setInterval(()=>{
+      t+=11;const r=RUMBLE.some(([a,b])=>t>=a&&t<b);
+      box.classList.toggle('rumble',r);snd?.rumble(r);draw();
+      if(t>=660)cut();
+    },50);
+  });
 }
 
 // ===== エンディング =====
